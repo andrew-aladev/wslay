@@ -22,38 +22,51 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "wslay_queue_test.h"
+#ifndef WSLAY_FRAME_H
+#define WSLAY_FRAME_H
 
-#include <CUnit/CUnit.h>
+#include "wslay.h"
 
-#include "wslay_queue.h"
+enum wslay_frame_state {
+    PREP_HEADER,
+    SEND_HEADER,
+    SEND_PAYLOAD,
+    RECV_HEADER1,
+    RECV_PAYLOADLEN,
+    RECV_EXT_PAYLOADLEN,
+    RECV_MASKKEY,
+    RECV_PAYLOAD
+};
 
-void test_wslay_queue(void)
-{
-  int ints[] = { 1, 2, 3, 4, 5 };
-  int i;
-  struct wslay_queue *queue = wslay_queue_new();
-  CU_ASSERT(wslay_queue_empty(queue));
-  for(i = 0; i < 5; ++i) {
-    wslay_queue_push(queue, &ints[i]);
-    CU_ASSERT_EQUAL(ints[0], *(int*)(wslay_queue_top(queue)));
-    CU_ASSERT(!wslay_queue_empty(queue));
-  }
-  for(i = 0; i < 5; ++i) {
-    CU_ASSERT_EQUAL(ints[i], *(int*)(wslay_queue_top(queue)));
-    wslay_queue_pop(queue);
-  }
-  CU_ASSERT(wslay_queue_empty(queue));
+struct wslay_frame_opcode_memo {
+    uint8_t fin;
+    uint8_t opcode;
+    uint8_t rsv;
+};
 
-  for(i = 0; i < 5; ++i) {
-    wslay_queue_push_front(queue, &ints[i]);
-    CU_ASSERT_EQUAL(ints[i], *(int*)(wslay_queue_top(queue)));
-    CU_ASSERT(!wslay_queue_empty(queue));
-  }
-  for(i = 4; i >= 0; --i) {
-    CU_ASSERT_EQUAL(ints[i], *(int*)(wslay_queue_top(queue)));
-    wslay_queue_pop(queue);
-  }
-  CU_ASSERT(wslay_queue_empty(queue));
-  wslay_queue_free(queue);
-}
+struct wslay_frame_context {
+    uint8_t ibuf[4096];
+    uint8_t *ibufmark;
+    uint8_t *ibuflimit;
+    struct wslay_frame_opcode_memo iom;
+    uint64_t ipayloadlen;
+    uint64_t ipayloadoff;
+    uint8_t imask;
+    uint8_t imaskkey[4];
+    enum wslay_frame_state istate;
+    size_t ireqread;
+
+    uint8_t oheader[14];
+    uint8_t *oheadermark;
+    uint8_t *oheaderlimit;
+    uint64_t opayloadlen;
+    uint64_t opayloadoff;
+    uint8_t omask;
+    uint8_t omaskkey[4];
+    enum wslay_frame_state ostate;
+
+    struct wslay_frame_callbacks callbacks;
+    void *user_data;
+};
+
+#endif /* WSLAY_FRAME_H */

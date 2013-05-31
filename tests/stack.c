@@ -22,27 +22,27 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "wslay_stack_test.h"
 
 #include <CUnit/CUnit.h>
 
-#include "wslay_stack.h"
+#include <wslay/stack.h>
+#include "stack.h"
 
 void test_wslay_stack()
 {
-  int ints[] = { 1, 2, 3, 4, 5 };
-  int i;
-  struct wslay_stack *stack = wslay_stack_new();
-  CU_ASSERT(wslay_stack_empty(stack));
-  for(i = 0; i < 5; ++i) {
-    wslay_stack_push(stack, &ints[i]);
-    CU_ASSERT_EQUAL(ints[i], *(int*)(wslay_stack_top(stack)));
-    CU_ASSERT(!wslay_stack_empty(stack));
-  }
-  for(i = 4; i >= 0; --i) {
-    CU_ASSERT_EQUAL(ints[i], *(int*)(wslay_stack_top(stack)));
-    wslay_stack_pop(stack);
-  }
-  CU_ASSERT(wslay_stack_empty(stack));
-  wslay_stack_free(stack);
+    int ints[] = { 1, 2, 3, 4, 5 };
+    int i;
+    struct wslay_stack *stack = wslay_stack_new();
+    CU_ASSERT ( wslay_stack_empty ( stack ) );
+    for ( i = 0; i < 5; ++i ) {
+        wslay_stack_push ( stack, &ints[i] );
+        CU_ASSERT_EQUAL ( ints[i], * ( int* ) ( wslay_stack_top ( stack ) ) );
+        CU_ASSERT ( !wslay_stack_empty ( stack ) );
+    }
+    for ( i = 4; i >= 0; --i ) {
+        CU_ASSERT_EQUAL ( ints[i], * ( int* ) ( wslay_stack_top ( stack ) ) );
+        wslay_stack_pop ( stack );
+    }
+    CU_ASSERT ( wslay_stack_empty ( stack ) );
+    wslay_stack_free ( stack );
 }

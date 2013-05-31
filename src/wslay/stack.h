@@ -22,25 +22,25 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#ifndef WSLAY_FRAME_TEST_H
-#define WSLAY_FRAME_TEST_H
+#ifndef WSLAY_STACK_H
+#define WSLAY_STACK_H
 
-void test_wslay_frame_context_init(void);
-void test_wslay_frame_recv(void);
-void test_wslay_frame_recv_1byte(void);
-void test_wslay_frame_recv_fragmented(void);
-void test_wslay_frame_recv_interleaved_ctrl_frame(void);
-void test_wslay_frame_recv_zero_payloadlen(void);
-void test_wslay_frame_recv_too_large_payload(void);
-void test_wslay_frame_recv_ctrl_frame_too_large_payload(void);
-void test_wslay_frame_recv_minimum_ext_payload16(void);
-void test_wslay_frame_recv_minimum_ext_payload64(void);
-void test_wslay_frame_send(void);
-void test_wslay_frame_send_fragmented(void);
-void test_wslay_frame_send_interleaved_ctrl_frame(void);
-void test_wslay_frame_send_1byte_masked(void);
-void test_wslay_frame_send_zero_payloadlen(void);
-void test_wslay_frame_send_too_large_payload(void);
-void test_wslay_frame_send_ctrl_frame_too_large_payload(void);
+#include "wslay.h"
 
-#endif /* WSLAY_FRAME_TEST_H */
+struct wslay_stack_cell {
+    void *data;
+    struct wslay_stack_cell *next;
+};
+
+struct wslay_stack {
+    struct wslay_stack_cell *top;
+};
+
+struct wslay_stack* wslay_stack_new();
+void wslay_stack_free ( struct wslay_stack *stack );
+int wslay_stack_push ( struct wslay_stack *stack, void *data );
+void wslay_stack_pop ( struct wslay_stack *stack );
+void* wslay_stack_top ( struct wslay_stack *stack );
+int wslay_stack_empty ( struct wslay_stack *stack );
+
+#endif /* WSLAY_STACK_H */

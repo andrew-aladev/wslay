@@ -22,6 +22,15 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "wslay_session_test.h"
+#include "net.h"
 
-#include <CUnit/CUnit.h>
+#ifndef WORDS_BIGENDIAN
+
+uint64_t wslay_byteswap64 ( uint64_t x )
+{
+    uint64_t u = ntohl ( x & 0xffffffff );
+    uint64_t l = ntohl ( x >> 32 );
+    return ( u << 32 ) | l;
+}
+
+#endif /* !WORDS_BIGENDIAN */
