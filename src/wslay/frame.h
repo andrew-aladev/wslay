@@ -69,4 +69,64 @@ struct wslay_frame_context {
     void *user_data;
 };
 
-#endif /* WSLAY_FRAME_H */
+struct wslay_frame_context;
+typedef struct wslay_frame_context * wslay_frame_context_ptr;
+
+/*
+ * Initializes ctx using given callbacks and user_data.
+ * This function allocates memory for struct wslay_frame_context and stores the result to *ctx.
+ * The callback functions specified in callbacks are copied to ctx.
+ * user_data is stored in ctx and it will be passed to callback functions.
+ * When the user code finished using ctx, it must call wslay_frame_context_free to deallocate memory.
+ */
+int wslay_frame_context_init ( wslay_frame_context_ptr * ctx, const struct wslay_frame_callbacks * callbacks, void * user_data );
+
+// Deallocates memory pointed by ctx.
+void wslay_frame_context_free ( wslay_frame_context_ptr ctx );
+
+/*
+ * Send WebSocket frame specified in iocb.
+ * ctx must be initialized using wslay_frame_context_init() function.
+ * iocb->fin must be 1 if this is a fin frame, otherwise 0.
+ * iocb->rsv is reserved bits.
+ * iocb->opcode must be the opcode of this frame.
+ * iocb->mask must be 1 if this is masked frame, otherwise 0.
+ * iocb->payload_length is the payload_length of this frame.
+ * iocb->data must point to the payload data to be sent.
+ * iocb->data_length must be the length of the data.
+ * This function calls recv_callback function if it needs to send bytes.
+ * This function calls gen_mask_callback function if it needs new mask key.
+ * This function returns the number of payload bytes sent.
+ * Please note that it does not include any number of header bytes.
+ * If it cannot send any single bytes of payload, it returns WSLAY_ERR_WANT_WRITE.
+ * If the library detects error in iocb, this function returns WSLAY_ERR_INVALID_ARGUMENT.
+ * If callback functions report a failure, this function returns WSLAY_ERR_INVALID_CALLBACK.
+ * This function does not always send all given data in iocb.
+ * If there are remaining data to be sent, adjust data and data_length in iocb accordingly and call this function again.
+ */
+ssize_t wslay_frame_send ( wslay_frame_context_ptr ctx, struct wslay_frame_iocb * iocb );
+
+/*
+ * Receives WebSocket frame and stores it in iocb.
+ * This function returns the number of payload bytes received.
+ * This does not include header bytes.
+ * In this case, iocb will be populated as follows:
+ * iocb->fin is 1 if received frame is fin frame, otherwise 0.
+ * iocb->rsv is reserved bits of received frame.
+ * iocb->opcode is opcode of received frame.
+ * iocb->mask is 1 if received frame is masked, otherwise 0.
+ * iocb->payload_length is the payload length of received frame.
+ * iocb->data is pointed to the buffer containing received payload data.
+ * This buffer is allocated by the library and must be read-only.
+ * iocb->data_length is the number of payload bytes recieved.
+ * This function calls recv_callback if it needs to receive additional bytes.
+ * If it cannot receive any single bytes of payload, it returns WSLAY_ERR_WANT_READ.
+ * If the library detects protocol violation in a received frame, this function returns WSLAY_ERR_PROTO.
+ * If callback functions report a failure, this function returns WSLAY_ERR_INVALID_CALLBACK.
+ * This function does not always receive whole frame in a single call.
+ * If there are remaining data to be received, call this function again.
+ * This function ensures frame alignment.
+ */
+ssize_t wslay_frame_recv ( wslay_frame_context_ptr ctx, struct wslay_frame_iocb * iocb );
+
+#endif
