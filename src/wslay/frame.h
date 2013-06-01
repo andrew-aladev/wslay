@@ -44,10 +44,10 @@ struct wslay_frame_opcode_memo {
     uint8_t rsv;
 };
 
-struct wslay_frame_context {
+typedef struct wslay_frame_context_t {
     uint8_t ibuf[4096];
-    uint8_t *ibufmark;
-    uint8_t *ibuflimit;
+    uint8_t * ibufmark;
+    uint8_t * ibuflimit;
     struct wslay_frame_opcode_memo iom;
     uint64_t ipayloadlen;
     uint64_t ipayloadoff;
@@ -57,8 +57,8 @@ struct wslay_frame_context {
     size_t ireqread;
 
     uint8_t oheader[14];
-    uint8_t *oheadermark;
-    uint8_t *oheaderlimit;
+    uint8_t * oheadermark;
+    uint8_t * oheaderlimit;
     uint64_t opayloadlen;
     uint64_t opayloadoff;
     uint8_t omask;
@@ -67,10 +67,7 @@ struct wslay_frame_context {
 
     struct wslay_frame_callbacks callbacks;
     void *user_data;
-};
-
-struct wslay_frame_context;
-typedef struct wslay_frame_context * wslay_frame_context_ptr;
+} wslay_frame_context;
 
 /*
  * Initializes ctx using given callbacks and user_data.
@@ -79,10 +76,10 @@ typedef struct wslay_frame_context * wslay_frame_context_ptr;
  * user_data is stored in ctx and it will be passed to callback functions.
  * When the user code finished using ctx, it must call wslay_frame_context_free to deallocate memory.
  */
-int wslay_frame_context_init ( wslay_frame_context_ptr * ctx, const struct wslay_frame_callbacks * callbacks, void * user_data );
+int wslay_frame_context_init ( wslay_frame_context ** ctx, const struct wslay_frame_callbacks * callbacks, void * user_data );
 
 // Deallocates memory pointed by ctx.
-void wslay_frame_context_free ( wslay_frame_context_ptr ctx );
+void wslay_frame_context_free ( wslay_frame_context * ctx );
 
 /*
  * Send WebSocket frame specified in iocb.
@@ -104,7 +101,7 @@ void wslay_frame_context_free ( wslay_frame_context_ptr ctx );
  * This function does not always send all given data in iocb.
  * If there are remaining data to be sent, adjust data and data_length in iocb accordingly and call this function again.
  */
-ssize_t wslay_frame_send ( wslay_frame_context_ptr ctx, struct wslay_frame_iocb * iocb );
+ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb );
 
 /*
  * Receives WebSocket frame and stores it in iocb.
@@ -127,6 +124,6 @@ ssize_t wslay_frame_send ( wslay_frame_context_ptr ctx, struct wslay_frame_iocb 
  * If there are remaining data to be received, call this function again.
  * This function ensures frame alignment.
  */
-ssize_t wslay_frame_recv ( wslay_frame_context_ptr ctx, struct wslay_frame_iocb * iocb );
+ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb );
 
 #endif

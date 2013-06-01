@@ -31,7 +31,7 @@
 
 void test_wslay_frame_context_init ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks;
     int user_data;
     CU_ASSERT_FALSE ( wslay_frame_context_init ( &ctx, &callbacks, &user_data ) );
@@ -89,7 +89,7 @@ static ssize_t scripted_send_callback ( const uint8_t* data, size_t len,
 
 void test_wslay_frame_recv ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -117,7 +117,7 @@ void test_wslay_frame_recv ( void )
 
 void test_wslay_frame_recv_1byte ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -155,7 +155,7 @@ void test_wslay_frame_recv_1byte ( void )
 
 void test_wslay_frame_recv_fragmented ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -194,7 +194,7 @@ void test_wslay_frame_recv_fragmented ( void )
 
 void test_wslay_frame_recv_interleaved_ctrl_frame ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -245,7 +245,7 @@ void test_wslay_frame_recv_interleaved_ctrl_frame ( void )
 
 void test_wslay_frame_recv_zero_payloadlen ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -271,7 +271,7 @@ void test_wslay_frame_recv_zero_payloadlen ( void )
 
 void test_wslay_frame_recv_too_large_payload ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -289,7 +289,7 @@ void test_wslay_frame_recv_too_large_payload ( void )
 
 void test_wslay_frame_recv_ctrl_frame_too_large_payload ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -307,7 +307,7 @@ void test_wslay_frame_recv_ctrl_frame_too_large_payload ( void )
 
 void test_wslay_frame_recv_minimum_ext_payload16 ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -325,7 +325,7 @@ void test_wslay_frame_recv_minimum_ext_payload16 ( void )
 
 void test_wslay_frame_recv_minimum_ext_payload64 ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -366,7 +366,7 @@ static int static_genmask_callback ( uint8_t *buf, size_t len,
 
 void test_wslay_frame_send ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
                NULL,
                static_genmask_callback
@@ -395,7 +395,7 @@ void test_wslay_frame_send ( void )
 
 void test_wslay_frame_send_fragmented ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
                NULL,
                static_genmask_callback
@@ -433,7 +433,7 @@ void test_wslay_frame_send_fragmented ( void )
 
 void test_wslay_frame_send_interleaved_ctrl_frame ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
                NULL,
                static_genmask_callback
@@ -485,7 +485,7 @@ void test_wslay_frame_send_interleaved_ctrl_frame ( void )
 
 void test_wslay_frame_send_1byte_masked ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { scripted_send_callback,
                NULL,
                static_genmask_callback
@@ -520,7 +520,7 @@ void test_wslay_frame_send_1byte_masked ( void )
 
 void test_wslay_frame_send_zero_payloadlen ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
                NULL,
                static_genmask_callback
@@ -546,7 +546,7 @@ void test_wslay_frame_send_zero_payloadlen ( void )
 
 void test_wslay_frame_send_too_large_payload ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks;
     struct wslay_frame_iocb iocb;
     wslay_frame_context_init ( &ctx, &callbacks, NULL );
@@ -563,7 +563,7 @@ void test_wslay_frame_send_too_large_payload ( void )
 
 void test_wslay_frame_send_ctrl_frame_too_large_payload ( void )
 {
-    wslay_frame_context_ptr ctx;
+    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks;
     struct wslay_frame_iocb iocb;
     wslay_frame_context_init ( &ctx, &callbacks, NULL );

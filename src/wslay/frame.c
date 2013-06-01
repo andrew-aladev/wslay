@@ -26,21 +26,19 @@
 #include <stddef.h>
 #include <string.h>
 #include <assert.h>
+#include <endian.h>
 
 #include "frame.h"
-#include "net.h"
 
 #define wslay_min(A, B) (((A) < (B)) ? (A) : (B))
 
-int wslay_frame_context_init ( wslay_frame_context_ptr *ctx,
-                               const struct wslay_frame_callbacks *callbacks,
-                               void *user_data )
+int wslay_frame_context_init ( wslay_frame_context ** ctx, const struct wslay_frame_callbacks * callbacks, void * user_data )
 {
-    *ctx = ( wslay_frame_context_ptr ) malloc ( sizeof ( struct wslay_frame_context ) );
+    *ctx = malloc ( sizeof ( wslay_frame_context ) );
     if ( ctx == NULL ) {
         return -1;
     }
-    memset ( *ctx, 0, sizeof ( struct wslay_frame_context ) );
+    memset ( *ctx, 0, sizeof ( wslay_frame_context ) );
     ( *ctx )->istate = RECV_HEADER1;
     ( *ctx )->ireqread = 2;
     ( *ctx )->ostate = PREP_HEADER;
@@ -50,13 +48,12 @@ int wslay_frame_context_init ( wslay_frame_context_ptr *ctx,
     return 0;
 }
 
-void wslay_frame_context_free ( wslay_frame_context_ptr ctx )
+void wslay_frame_context_free ( wslay_frame_context * ctx )
 {
     free ( ctx );
 }
 
-ssize_t wslay_frame_send ( wslay_frame_context_ptr ctx,
-                           struct wslay_frame_iocb *iocb )
+ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb )
 {
     if ( iocb->data_length > iocb->payload_length ) {
         return WSLAY_ERR_INVALID_ARGUMENT;
@@ -82,7 +79,7 @@ ssize_t wslay_frame_send ( wslay_frame_context_ptr ctx,
             memcpy ( hdptr, &len, 2 );
             hdptr += 2;
         } else if ( iocb->payload_length < ( 1ull << 63 ) ) {
-            uint64_t len = hton64 ( iocb->payload_length );
+            uint64_t len = htobe64 ( iocb->payload_length );
             *hdptr |= 127;
             ++hdptr;
             memcpy ( hdptr, &len, 8 );
@@ -189,7 +186,7 @@ ssize_t wslay_frame_send ( wslay_frame_context_ptr ctx,
     return WSLAY_ERR_INVALID_ARGUMENT;
 }
 
-static void wslay_shift_ibuf ( wslay_frame_context_ptr ctx )
+static void wslay_shift_ibuf ( wslay_frame_context * ctx )
 {
     ptrdiff_t len = ctx->ibuflimit - ctx->ibufmark;
     memmove ( ctx->ibuf, ctx->ibufmark, len );
@@ -197,15 +194,13 @@ static void wslay_shift_ibuf ( wslay_frame_context_ptr ctx )
     ctx->ibufmark = ctx->ibuf;
 }
 
-static ssize_t wslay_recv ( wslay_frame_context_ptr ctx )
+static ssize_t wslay_recv ( wslay_frame_context * ctx )
 {
     ssize_t r;
     if ( ctx->ibufmark != ctx->ibuf ) {
         wslay_shift_ibuf ( ctx );
     }
-    r = ctx->callbacks.recv_callback
-        ( ctx->ibuflimit, ctx->ibuf + sizeof ( ctx->ibuf ) - ctx->ibuflimit,
-          0, ctx->user_data );
+    r = ctx->callbacks.recv_callback ( ctx->ibuflimit, ctx->ibuf + sizeof ( ctx->ibuf ) - ctx->ibuflimit, 0, ctx->user_data );
     if ( r > 0 ) {
         ctx->ibuflimit += r;
     } else {
@@ -216,8 +211,7 @@ static ssize_t wslay_recv ( wslay_frame_context_ptr ctx )
 
 #define WSLAY_AVAIL_IBUF(ctx) ((size_t)(ctx->ibuflimit - ctx->ibufmark))
 
-ssize_t wslay_frame_recv ( wslay_frame_context_ptr ctx,
-                           struct wslay_frame_iocb *iocb )
+ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb )
 {
     ssize_t r;
     if ( ctx->istate == RECV_HEADER1 ) {
@@ -273,7 +267,7 @@ ssize_t wslay_frame_recv ( wslay_frame_context_ptr ctx,
         ctx->ipayloadoff = 0;
         memcpy ( ( uint8_t* ) &ctx->ipayloadlen + ( 8 - ctx->ireqread ),
                  ctx->ibufmark, ctx->ireqread );
-        ctx->ipayloadlen = ntoh64 ( ctx->ipayloadlen );
+        ctx->ipayloadlen = be64toh ( ctx->ipayloadlen );
         ctx->ibufmark += ctx->ireqread;
         if ( ctx->ireqread == 8 ) {
             if ( ctx->ipayloadlen < ( 1 << 16 ) ||
