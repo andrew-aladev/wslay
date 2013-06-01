@@ -49,8 +49,10 @@ Build from git
 
 Building from git is easy
 
+    $ git submodule update --init
     $ mkdir build
     $ cd build
     $ cmake ..
     $ make
     $ make test
+
