@@ -29,8 +29,6 @@
 #include "frame.h"
 #include "queue.h"
 
-struct wslay_stack;
-
 struct wslay_event_byte_chunk {
     uint8_t * data;
     size_t data_length;

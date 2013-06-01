@@ -24,62 +24,25 @@
  */
 #include "stack.h"
 
+#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-struct wslay_stack* wslay_stack_new()
-{
-    struct wslay_stack *stack = ( struct wslay_stack* ) malloc
-                                ( sizeof ( struct wslay_stack ) );
-    if ( !stack ) {
-        return NULL;
-    }
-    stack->top = NULL;
-    return stack;
-}
+extern inline
+wslay_stack * wslay_stack_new ( void * ctx );
 
-void wslay_stack_free ( struct wslay_stack *stack )
-{
-    if ( !stack ) {
-        return;
-    }
-    struct wslay_stack_cell *p = stack->top;
-    while ( p ) {
-        struct wslay_stack_cell *next = p->next;
-        free ( p );
-        p = next;
-    }
-    free ( stack );
-}
+extern inline
+uint8_t wslay_stack_free ( void * data );
 
-int wslay_stack_push ( struct wslay_stack *stack, void *data )
-{
-    struct wslay_stack_cell *new_cell = ( struct wslay_stack_cell* ) malloc
-                                        ( sizeof ( struct wslay_stack_cell ) );
-    if ( !new_cell ) {
-        return WSLAY_ERR_NOMEM;
-    }
-    new_cell->data = data;
-    new_cell->next = stack->top;
-    stack->top = new_cell;
-    return 0;
-}
+extern inline
+uint8_t wslay_stack_push ( wslay_stack * stack, void * data );
 
-void wslay_stack_pop ( struct wslay_stack *stack )
-{
-    struct wslay_stack_cell *top = stack->top;
-    assert ( top );
-    stack->top = top->next;
-    free ( top );
-}
+extern inline
+uint8_t wslay_stack_pop ( wslay_stack * stack );
 
-void* wslay_stack_top ( struct wslay_stack *stack )
-{
-    assert ( stack->top );
-    return stack->top->data;
-}
+extern inline
+void * wslay_stack_top ( wslay_stack * stack );
 
-int wslay_stack_empty ( struct wslay_stack *stack )
-{
-    return stack->top == NULL;
-}
+extern inline
+bool wslay_stack_is_empty ( wslay_stack *stack );

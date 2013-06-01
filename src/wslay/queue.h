@@ -83,10 +83,9 @@ uint8_t wslay_queue_push ( wslay_queue * queue, void * data )
     }
     new_cell->data = data;
     new_cell->next = NULL;
-    if ( queue->tail ) {
+    if ( queue->tail != NULL ) {
         queue->tail->next = new_cell;
         queue->tail = new_cell;
-
     } else {
         queue->top = queue->tail = new_cell;
     }
