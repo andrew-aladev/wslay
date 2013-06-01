@@ -32,28 +32,29 @@ void test_wslay_queue ( void )
 {
     int ints[] = { 1, 2, 3, 4, 5 };
     int i;
-    struct wslay_queue *queue = wslay_queue_new();
-    CU_ASSERT ( wslay_queue_empty ( queue ) );
+    wslay_queue * queue = wslay_queue_new ( NULL );
+    CU_ASSERT ( queue != NULL );
+    CU_ASSERT ( wslay_queue_is_empty ( queue ) );
     for ( i = 0; i < 5; ++i ) {
-        wslay_queue_push ( queue, &ints[i] );
-        CU_ASSERT_EQUAL ( ints[0], * ( int* ) ( wslay_queue_top ( queue ) ) );
-        CU_ASSERT ( !wslay_queue_empty ( queue ) );
+        CU_ASSERT ( wslay_queue_push ( queue, &ints[i] ) != 0 );
+        CU_ASSERT_EQUAL ( ints[0], * ( int * ) ( wslay_queue_top ( queue ) ) );
+        CU_ASSERT ( !wslay_queue_is_empty ( queue ) );
     }
     for ( i = 0; i < 5; ++i ) {
-        CU_ASSERT_EQUAL ( ints[i], * ( int* ) ( wslay_queue_top ( queue ) ) );
-        wslay_queue_pop ( queue );
+        CU_ASSERT_EQUAL ( ints[i], * ( int * ) ( wslay_queue_top ( queue ) ) );
+        CU_ASSERT ( wslay_queue_pop ( queue ) != 0 );
     }
-    CU_ASSERT ( wslay_queue_empty ( queue ) );
+    CU_ASSERT ( wslay_queue_is_empty ( queue ) );
 
     for ( i = 0; i < 5; ++i ) {
-        wslay_queue_push_front ( queue, &ints[i] );
-        CU_ASSERT_EQUAL ( ints[i], * ( int* ) ( wslay_queue_top ( queue ) ) );
-        CU_ASSERT ( !wslay_queue_empty ( queue ) );
+        CU_ASSERT ( wslay_queue_push_front ( queue, &ints[i] ) != 0 );
+        CU_ASSERT_EQUAL ( ints[i], * ( int * ) ( wslay_queue_top ( queue ) ) );
+        CU_ASSERT ( !wslay_queue_is_empty ( queue ) );
     }
     for ( i = 4; i >= 0; --i ) {
-        CU_ASSERT_EQUAL ( ints[i], * ( int* ) ( wslay_queue_top ( queue ) ) );
-        wslay_queue_pop ( queue );
+        CU_ASSERT_EQUAL ( ints[i], * ( int * ) ( wslay_queue_top ( queue ) ) );
+        CU_ASSERT ( wslay_queue_pop ( queue ) != 0 );
     }
-    CU_ASSERT ( wslay_queue_empty ( queue ) );
-    wslay_queue_free ( queue );
+    CU_ASSERT ( wslay_queue_is_empty ( queue ) );
+    talloc_free ( queue );
 }

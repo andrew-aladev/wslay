@@ -27,9 +27,9 @@
 
 #include "wslay.h"
 #include "frame.h"
+#include "queue.h"
 
 struct wslay_stack;
-struct wslay_queue;
 
 struct wslay_event_byte_chunk {
     uint8_t * data;
@@ -41,7 +41,7 @@ struct wslay_event_imsg {
     uint8_t rsv;
     uint8_t opcode;
     uint32_t utf8state;
-    struct wslay_queue * chunks;
+    wslay_queue * chunks;
     size_t msg_length;
 };
 
@@ -193,9 +193,9 @@ struct wslay_event_context {
     // Pointer to the message currently being sent. NULL if no message is currently sent.
     struct wslay_event_omsg * omsg;
     // Queue for non-control frames
-    struct wslay_queue * send_queue;
+    wslay_queue * send_queue;
     // Queue for control frames
-    struct wslay_queue * send_ctrl_queue;
+    wslay_queue * send_ctrl_queue;
     // Size of send_queue + size of send_ctrl_queue
     size_t queued_msg_count;
     // The sum of message length in send_queue

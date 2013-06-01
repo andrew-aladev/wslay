@@ -22,96 +22,33 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "queue.h"
 
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-struct wslay_queue* wslay_queue_new ( void )
-{
-    struct wslay_queue *queue = ( struct wslay_queue* ) malloc
-                                ( sizeof ( struct wslay_queue ) );
-    if ( !queue ) {
-        return NULL;
-    }
-    queue->top = queue->tail = NULL;
-    return queue;
-}
+#include "queue.h"
 
-void wslay_queue_free ( struct wslay_queue *queue )
-{
-    if ( !queue ) {
-        return;
-    } else {
-        struct wslay_queue_cell *p = queue->top;
-        while ( p ) {
-            struct wslay_queue_cell *next = p->next;
-            free ( p );
-            p = next;
-        }
-        free ( queue );
-    }
-}
+extern inline
+wslay_queue * wslay_queue_new ();
 
-int wslay_queue_push ( struct wslay_queue *queue, void *data )
-{
-    struct wslay_queue_cell *new_cell = ( struct wslay_queue_cell* ) malloc
-                                        ( sizeof ( struct wslay_queue_cell ) );
-    if ( !new_cell ) {
-        return WSLAY_ERR_NOMEM;
-    }
-    new_cell->data = data;
-    new_cell->next = NULL;
-    if ( queue->tail ) {
-        queue->tail->next = new_cell;
-        queue->tail = new_cell;
+extern inline
+uint8_t wslay_queue_free ( void * data );
 
-    } else {
-        queue->top = queue->tail = new_cell;
-    }
-    return 0;
-}
+extern inline
+uint8_t wslay_queue_push ( wslay_queue * queue, void * data );
 
-int wslay_queue_push_front ( struct wslay_queue *queue, void *data )
-{
-    struct wslay_queue_cell *new_cell = ( struct wslay_queue_cell* ) malloc
-                                        ( sizeof ( struct wslay_queue_cell ) );
-    if ( !new_cell ) {
-        return WSLAY_ERR_NOMEM;
-    }
-    new_cell->data = data;
-    new_cell->next = queue->top;
-    queue->top = new_cell;
-    if ( !queue->tail ) {
-        queue->tail = queue->top;
-    }
-    return 0;
-}
+extern inline
+uint8_t wslay_queue_push_front ( wslay_queue * queue, void * data );
 
-void wslay_queue_pop ( struct wslay_queue *queue )
-{
-    struct wslay_queue_cell *top = queue->top;
-    assert ( top );
-    queue->top = top->next;
-    if ( top == queue->tail ) {
-        queue->tail = NULL;
-    }
-    free ( top );
-}
+extern inline
+uint8_t wslay_queue_pop ( wslay_queue * queue );
 
-void* wslay_queue_top ( struct wslay_queue *queue )
-{
-    assert ( queue->top );
-    return queue->top->data;
-}
+extern inline
+void * wslay_queue_top ( wslay_queue * queue );
 
-void* wslay_queue_tail ( struct wslay_queue *queue )
-{
-    assert ( queue->tail );
-    return queue->tail->data;
-}
+extern inline
+void * wslay_queue_tail ( wslay_queue * queue );
 
-int wslay_queue_empty ( struct wslay_queue *queue )
-{
-    return queue->top == NULL;
-}
+extern inline
+bool wslay_queue_is_empty ( wslay_queue * queue );

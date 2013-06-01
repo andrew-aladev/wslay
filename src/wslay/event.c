@@ -172,7 +172,7 @@ static void wslay_event_imsg_chunks_free ( struct wslay_event_imsg *m )
     if ( !m->chunks ) {
         return;
     }
-    while ( !wslay_queue_empty ( m->chunks ) ) {
+    while ( !wslay_queue_is_empty ( m->chunks ) ) {
         wslay_event_byte_chunk_free ( wslay_queue_top ( m->chunks ) );
         wslay_queue_pop ( m->chunks );
     }
@@ -253,7 +253,7 @@ static void wslay_event_omsg_free ( struct wslay_event_omsg *m )
     free ( m );
 }
 
-static uint8_t* wslay_event_flatten_queue ( struct wslay_queue *queue, size_t len )
+static uint8_t* wslay_event_flatten_queue ( wslay_queue *queue, size_t len )
 {
     if ( len == 0 ) {
         return NULL;
@@ -263,8 +263,8 @@ static uint8_t* wslay_event_flatten_queue ( struct wslay_queue *queue, size_t le
         if ( !buf ) {
             return NULL;
         }
-        while ( !wslay_queue_empty ( queue ) ) {
-            struct wslay_event_byte_chunk *chunk = wslay_queue_top ( queue );
+        while ( !wslay_queue_is_empty ( queue ) ) {
+            struct wslay_event_byte_chunk * chunk = wslay_queue_top ( queue );
             memcpy ( buf + off, chunk->data, chunk->data_length );
             off += chunk->data_length;
             wslay_event_byte_chunk_free ( chunk );
@@ -409,12 +409,12 @@ static int wslay_event_context_init
         return r;
     }
     ( *ctx )->read_enabled = ( *ctx )->write_enabled = 1;
-    ( *ctx )->send_queue = wslay_queue_new();
+    ( *ctx )->send_queue = wslay_queue_new ( NULL );
     if ( ! ( *ctx )->send_queue ) {
         wslay_event_context_free ( *ctx );
         return WSLAY_ERR_NOMEM;
     }
-    ( *ctx )->send_ctrl_queue = wslay_queue_new();
+    ( *ctx )->send_ctrl_queue = wslay_queue_new ( NULL );
     if ( ! ( *ctx )->send_ctrl_queue ) {
         wslay_event_context_free ( *ctx );
         return WSLAY_ERR_NOMEM;
@@ -423,7 +423,7 @@ static int wslay_event_context_init
     ( *ctx )->queued_msg_length = 0;
     for ( i = 0; i < 2; ++i ) {
         wslay_event_imsg_reset ( & ( *ctx )->imsgs[i] );
-        ( *ctx )->imsgs[i].chunks = wslay_queue_new();
+        ( *ctx )->imsgs[i].chunks = wslay_queue_new ( NULL );
         if ( ! ( *ctx )->imsgs[i].chunks ) {
             wslay_event_context_free ( *ctx );
             return WSLAY_ERR_NOMEM;
@@ -471,21 +471,21 @@ void wslay_event_context_free ( wslay_event_context_ptr ctx )
     }
     for ( i = 0; i < 2; ++i ) {
         wslay_event_imsg_chunks_free ( &ctx->imsgs[i] );
-        wslay_queue_free ( ctx->imsgs[i].chunks );
+        talloc_free ( ctx->imsgs[i].chunks );
     }
     if ( ctx->send_queue ) {
-        while ( !wslay_queue_empty ( ctx->send_queue ) ) {
+        while ( !wslay_queue_is_empty ( ctx->send_queue ) ) {
             wslay_event_omsg_free ( wslay_queue_top ( ctx->send_queue ) );
             wslay_queue_pop ( ctx->send_queue );
         }
-        wslay_queue_free ( ctx->send_queue );
+        talloc_free ( ctx->send_queue );
     }
     if ( ctx->send_ctrl_queue ) {
-        while ( !wslay_queue_empty ( ctx->send_ctrl_queue ) ) {
+        while ( !wslay_queue_is_empty ( ctx->send_ctrl_queue ) ) {
             wslay_event_omsg_free ( wslay_queue_top ( ctx->send_ctrl_queue ) );
             wslay_queue_pop ( ctx->send_ctrl_queue );
         }
-        wslay_queue_free ( ctx->send_ctrl_queue );
+        talloc_free ( ctx->send_ctrl_queue );
     }
     wslay_frame_context_free ( ctx->frame_ctx );
     wslay_event_omsg_free ( ctx->omsg );
@@ -758,7 +758,7 @@ static struct wslay_event_omsg* wslay_event_send_ctrl_queue_pop
      * other than Close.
      */
     if ( ctx->close_status & WSLAY_CLOSE_QUEUED ) {
-        while ( !wslay_queue_empty ( ctx->send_ctrl_queue ) ) {
+        while ( !wslay_queue_is_empty ( ctx->send_ctrl_queue ) ) {
             struct wslay_event_omsg *msg = wslay_queue_top ( ctx->send_ctrl_queue );
             wslay_queue_pop ( ctx->send_ctrl_queue );
             if ( msg->opcode == WSLAY_CONNECTION_CLOSE ) {
@@ -780,10 +780,10 @@ int wslay_event_send ( wslay_event_context_ptr ctx )
     struct wslay_frame_iocb iocb;
     ssize_t r;
     while ( ctx->write_enabled &&
-            ( !wslay_queue_empty ( ctx->send_queue ) ||
-              !wslay_queue_empty ( ctx->send_ctrl_queue ) || ctx->omsg ) ) {
+            ( !wslay_queue_is_empty ( ctx->send_queue ) ||
+              !wslay_queue_is_empty ( ctx->send_ctrl_queue ) || ctx->omsg ) ) {
         if ( !ctx->omsg ) {
-            if ( wslay_queue_empty ( ctx->send_ctrl_queue ) ) {
+            if ( wslay_queue_is_empty ( ctx->send_ctrl_queue ) ) {
                 ctx->omsg = wslay_queue_top ( ctx->send_queue );
                 wslay_queue_pop ( ctx->send_queue );
             } else {
@@ -797,7 +797,7 @@ int wslay_event_send ( wslay_event_context_ptr ctx )
             }
         } else if ( !wslay_is_ctrl_frame ( ctx->omsg->opcode ) &&
                     ctx->frame_ctx->ostate == PREP_HEADER &&
-                    !wslay_queue_empty ( ctx->send_ctrl_queue ) ) {
+                    !wslay_queue_is_empty ( ctx->send_ctrl_queue ) ) {
             if ( ( r = wslay_queue_push_front ( ctx->send_queue, ctx->omsg ) ) != 0 ) {
                 ctx->write_enabled = 0;
                 return r;
@@ -915,8 +915,8 @@ int wslay_event_want_read ( wslay_event_context_ptr ctx )
 int wslay_event_want_write ( wslay_event_context_ptr ctx )
 {
     return ctx->write_enabled &&
-           ( !wslay_queue_empty ( ctx->send_queue ) ||
-             !wslay_queue_empty ( ctx->send_ctrl_queue ) || ctx->omsg );
+           ( !wslay_queue_is_empty ( ctx->send_queue ) ||
+             !wslay_queue_is_empty ( ctx->send_ctrl_queue ) || ctx->omsg );
 }
 
 void wslay_event_shutdown_read ( wslay_event_context_ptr ctx )

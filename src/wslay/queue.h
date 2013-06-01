@@ -25,25 +25,121 @@
 #ifndef WSLAY_QUEUE_H
 #define WSLAY_QUEUE_H
 
+#include <stdbool.h>
+
+#include <talloc2/tree.h>
+#include <talloc2/ext/destructor.h>
+
 #include "wslay.h"
 
-struct wslay_queue_cell {
-    void *data;
-    struct wslay_queue_cell *next;
-};
+typedef struct wslay_queue_cell_t {
+    void * data;
+    struct wslay_queue_cell_t * next;
+} wslay_queue_cell;
 
-struct wslay_queue {
-    struct wslay_queue_cell *top;
-    struct wslay_queue_cell *tail;
-};
+typedef struct wslay_queue_t {
+    wslay_queue_cell * top;
+    wslay_queue_cell * tail;
+} wslay_queue;
 
-struct wslay_queue* wslay_queue_new ( void );
-void wslay_queue_free ( struct wslay_queue *queue );
-int wslay_queue_push ( struct wslay_queue *queue, void *data );
-int wslay_queue_push_front ( struct wslay_queue *queue, void *data );
-void wslay_queue_pop ( struct wslay_queue *queue );
-void* wslay_queue_top ( struct wslay_queue *queue );
-void* wslay_queue_tail ( struct wslay_queue *queue );
-int wslay_queue_empty ( struct wslay_queue *queue );
+inline
+uint8_t wslay_queue_free ( void * data )
+{
+    wslay_queue * queue = data;
+    if ( queue == NULL ) {
+        return 1;
+    }
 
-#endif /* WSLAY_QUEUE_H */
+    wslay_queue_cell * cell = queue->top;
+    wslay_queue_cell * next_cell;
+    while ( cell != NULL ) {
+        next_cell = cell->next;
+        free ( cell );
+        cell = next_cell;
+    }
+    return 0;
+}
+
+inline
+wslay_queue * wslay_queue_new ( void * ctx )
+{
+    wslay_queue * queue = talloc ( ctx, sizeof ( wslay_queue ) );
+    if ( queue == NULL ) {
+        return NULL;
+    }
+    if ( talloc_set_destructor ( queue, wslay_queue_free ) != 0 ) {
+        return NULL;
+    }
+    queue->top = queue->tail = NULL;
+    return queue;
+}
+
+inline
+uint8_t wslay_queue_push ( wslay_queue * queue, void * data )
+{
+    wslay_queue_cell * new_cell = malloc ( sizeof ( wslay_queue_cell ) );
+    if ( new_cell == NULL ) {
+        return 1;
+    }
+    new_cell->data = data;
+    new_cell->next = NULL;
+    if ( queue->tail ) {
+        queue->tail->next = new_cell;
+        queue->tail = new_cell;
+
+    } else {
+        queue->top = queue->tail = new_cell;
+    }
+    return 0;
+}
+
+inline
+uint8_t wslay_queue_push_front ( wslay_queue * queue, void * data )
+{
+    wslay_queue_cell * new_cell = malloc ( sizeof ( wslay_queue_cell ) );
+    if ( new_cell == NULL ) {
+        return 1;
+    }
+    new_cell->data = data;
+    new_cell->next = queue->top;
+    queue->top = new_cell;
+    if ( queue->tail == NULL ) {
+        queue->tail = queue->top;
+    }
+    return 0;
+}
+
+inline
+uint8_t wslay_queue_pop ( wslay_queue * queue )
+{
+    wslay_queue_cell * top = queue->top;
+    if ( top == NULL ) {
+        return 1;
+    }
+    queue->top = top->next;
+    if ( top == queue->tail ) {
+        queue->tail = NULL;
+    }
+    free ( top );
+    return 0;
+}
+
+inline
+void * wslay_queue_top ( wslay_queue * queue )
+{
+    return queue->top->data;
+}
+
+inline
+void * wslay_queue_tail ( wslay_queue * queue )
+{
+    return queue->tail->data;
+}
+
+inline
+bool wslay_queue_is_empty ( wslay_queue * queue )
+{
+    return queue->top == NULL;
+}
+
+#endif
