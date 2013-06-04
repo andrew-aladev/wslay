@@ -74,12 +74,8 @@ typedef struct wslay_frame_context_t {
  * This function allocates memory for struct wslay_frame_context and stores the result to *ctx.
  * The callback functions specified in callbacks are copied to ctx.
  * user_data is stored in ctx and it will be passed to callback functions.
- * When the user code finished using ctx, it must call wslay_frame_context_free to deallocate memory.
  */
-int wslay_frame_context_init ( wslay_frame_context ** ctx, const struct wslay_frame_callbacks * callbacks, void * user_data );
-
-// Deallocates memory pointed by ctx.
-void wslay_frame_context_free ( wslay_frame_context * ctx );
+uint8_t wslay_frame_context_init ( void * ctx, wslay_frame_context ** result_frame_ctx, const struct wslay_frame_callbacks * callbacks, void * user_data );
 
 /*
  * Send WebSocket frame specified in iocb.
@@ -101,7 +97,7 @@ void wslay_frame_context_free ( wslay_frame_context * ctx );
  * This function does not always send all given data in iocb.
  * If there are remaining data to be sent, adjust data and data_length in iocb accordingly and call this function again.
  */
-ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb );
+int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb, size_t * length );
 
 /*
  * Receives WebSocket frame and stores it in iocb.

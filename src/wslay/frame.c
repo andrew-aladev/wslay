@@ -27,33 +27,31 @@
 #include <string.h>
 #include <assert.h>
 #include <endian.h>
+#include <arpa/inet.h>
 
 #include "frame.h"
 
+#include <talloc2/tree.h>
+
 #define wslay_min(A, B) (((A) < (B)) ? (A) : (B))
 
-int wslay_frame_context_init ( wslay_frame_context ** ctx, const struct wslay_frame_callbacks * callbacks, void * user_data )
+uint8_t wslay_frame_context_init ( void * ctx, wslay_frame_context ** frame_ctx_ptr, const struct wslay_frame_callbacks * callbacks, void * user_data )
 {
-    *ctx = malloc ( sizeof ( wslay_frame_context ) );
-    if ( ctx == NULL ) {
-        return -1;
+    wslay_frame_context * frame_ctx = talloc_zero ( ctx, sizeof ( wslay_frame_context ) );
+    if ( frame_ctx == NULL ) {
+        return 1;
     }
-    memset ( *ctx, 0, sizeof ( wslay_frame_context ) );
-    ( *ctx )->istate = RECV_HEADER1;
-    ( *ctx )->ireqread = 2;
-    ( *ctx )->ostate = PREP_HEADER;
-    ( *ctx )->user_data = user_data;
-    ( *ctx )->ibufmark = ( *ctx )->ibuflimit = ( *ctx )->ibuf;
-    ( *ctx )->callbacks = *callbacks;
+    frame_ctx->istate    = RECV_HEADER1;
+    frame_ctx->ireqread  = 2;
+    frame_ctx->ostate    = PREP_HEADER;
+    frame_ctx->user_data = user_data;
+    frame_ctx->ibufmark  = frame_ctx->ibuflimit = frame_ctx->ibuf;
+    frame_ctx->callbacks = * callbacks;
+    * frame_ctx_ptr = frame_ctx;
     return 0;
 }
 
-void wslay_frame_context_free ( wslay_frame_context * ctx )
-{
-    free ( ctx );
-}
-
-ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb )
+int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb, size_t * length )
 {
     if ( iocb->data_length > iocb->payload_length ) {
         return WSLAY_ERR_INVALID_ARGUMENT;
@@ -61,36 +59,35 @@ ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
     if ( ctx->ostate == PREP_HEADER ) {
         uint8_t *hdptr = ctx->oheader;
         memset ( ctx->oheader, 0, sizeof ( ctx->oheader ) );
-        *hdptr |= ( iocb->fin << 7 ) & 0x80u;
-        *hdptr |= ( iocb->rsv << 4 ) & 0x70u;
-        *hdptr |= iocb->opcode & 0xfu;
-        ++hdptr;
-        *hdptr |= ( iocb->mask << 7 ) & 0x80u;
+        * hdptr |= ( iocb->fin << 7 ) & 0x80u;
+        * hdptr |= ( iocb->rsv << 4 ) & 0x70u;
+        * hdptr |= iocb->opcode & 0xfu;
+        hdptr ++;
+        * hdptr |= ( iocb->mask << 7 ) & 0x80u;
         if ( wslay_is_ctrl_frame ( iocb->opcode ) && iocb->payload_length > 125 ) {
             return WSLAY_ERR_INVALID_ARGUMENT;
         }
         if ( iocb->payload_length < 126 ) {
-            *hdptr |= iocb->payload_length;
-            ++hdptr;
+            * hdptr |= iocb->payload_length;
+            hdptr ++;
         } else if ( iocb->payload_length < ( 1 << 16 ) ) {
             uint16_t len = htons ( iocb->payload_length );
-            *hdptr |= 126;
-            ++hdptr;
+            * hdptr |= 126;
+            hdptr ++;
             memcpy ( hdptr, &len, 2 );
             hdptr += 2;
         } else if ( iocb->payload_length < ( 1ull << 63 ) ) {
             uint64_t len = htobe64 ( iocb->payload_length );
-            *hdptr |= 127;
-            ++hdptr;
+            * hdptr |= 127;
+            hdptr ++;
             memcpy ( hdptr, &len, 8 );
             hdptr += 8;
         } else {
-            /* Too large payload length */
+            // Too large payload length
             return WSLAY_ERR_INVALID_ARGUMENT;
         }
         if ( iocb->mask ) {
-            if ( ctx->callbacks.genmask_callback ( ctx->omaskkey, 4,
-                                                   ctx->user_data ) != 0 ) {
+            if ( ctx->callbacks.genmask_callback ( ctx->omaskkey, 4, ctx->user_data ) != 0 ) {
                 return WSLAY_ERR_INVALID_CALLBACK;
             } else {
                 ctx->omask = 1;
@@ -111,8 +108,7 @@ ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
         if ( iocb->data_length > 0 ) {
             flags |= WSLAY_MSG_MORE;
         };
-        r = ctx->callbacks.send_callback ( ctx->oheadermark, len, flags,
-                                           ctx->user_data );
+        r = ctx->callbacks.send_callback ( ctx->oheadermark, len, flags, ctx->user_data );
         if ( r > 0 ) {
             if ( r > len ) {
                 return WSLAY_ERR_INVALID_CALLBACK;
@@ -133,12 +129,11 @@ ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
         if ( iocb->data_length > 0 ) {
             if ( ctx->omask ) {
                 uint8_t temp[4096];
-                const uint8_t *datamark = iocb->data,
-                               *datalimit = iocb->data + iocb->data_length;
+                const uint8_t * datamark  = iocb->data;
+                const uint8_t * datalimit = datamark + iocb->data_length;
                 while ( datamark < datalimit ) {
                     size_t datalen = datalimit - datamark;
-                    const uint8_t *writelimit = datamark +
-                                                wslay_min ( sizeof ( temp ), datalen );
+                    const uint8_t *writelimit = datamark + wslay_min ( sizeof ( temp ), datalen );
                     size_t writelen = writelimit - datamark;
                     ssize_t r;
                     size_t i;
@@ -181,7 +176,8 @@ ssize_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
         if ( ctx->opayloadoff == ctx->opayloadlen ) {
             ctx->ostate = PREP_HEADER;
         }
-        return totallen;
+        * length = totallen;
+        return 0;
     }
     return WSLAY_ERR_INVALID_ARGUMENT;
 }

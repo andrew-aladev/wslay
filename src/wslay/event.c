@@ -32,6 +32,8 @@
 #include "queue.h"
 #include "frame.h"
 
+#include <talloc2/tree.h>
+
 /* Start of utf8 dfa */
 /* Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
  * See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
@@ -392,7 +394,7 @@ static int wslay_event_context_init ( wslay_event_context ** ctx, const struct w
     ( *ctx )->user_data = user_data;
     ( *ctx )->frame_user_data.ctx = *ctx;
     ( *ctx )->frame_user_data.user_data = user_data;
-    if ( ( r = wslay_frame_context_init ( & ( *ctx )->frame_ctx, &frame_callbacks,
+    if ( ( r = wslay_frame_context_init ( NULL, & ( *ctx )->frame_ctx, &frame_callbacks,
                                           & ( *ctx )->frame_user_data ) ) != 0 ) {
         wslay_event_context_free ( *ctx );
         return r;
@@ -470,7 +472,7 @@ void wslay_event_context_free ( wslay_event_context * ctx )
         }
         talloc_free ( ctx->send_ctrl_queue );
     }
-    wslay_frame_context_free ( ctx->frame_ctx );
+    talloc_free ( ctx->frame_ctx );
     wslay_event_omsg_free ( ctx->omsg );
     free ( ctx );
 }
@@ -795,11 +797,12 @@ int wslay_event_send ( wslay_event_context * ctx )
             iocb.data = ctx->omsg->data + ctx->opayloadoff;
             iocb.data_length = ctx->opayloadlen - ctx->opayloadoff;
             iocb.payload_length = ctx->opayloadlen;
-            r = wslay_frame_send ( ctx->frame_ctx, &iocb );
-            if ( r >= 0 ) {
-                ctx->opayloadoff += r;
+            size_t length;
+            int16_t result = wslay_frame_send ( ctx->frame_ctx, &iocb, &length );
+            if ( result == 0 ) {
+                ctx->opayloadoff += length;
                 if ( ctx->opayloadoff == ctx->opayloadlen ) {
-                    --ctx->queued_msg_count;
+                    ctx->queued_msg_count --;
                     ctx->queued_msg_length -= ctx->omsg->data_length;
                     if ( ctx->omsg->opcode == WSLAY_CONNECTION_CLOSE ) {
                         uint16_t status_code = 0;
@@ -818,8 +821,7 @@ int wslay_event_send ( wslay_event_context * ctx )
                     break;
                 }
             } else {
-                if ( r != WSLAY_ERR_WANT_WRITE ||
-                        ( ctx->error != WSLAY_ERR_WOULDBLOCK && ctx->error != 0 ) ) {
+                if ( result != WSLAY_ERR_WANT_WRITE || ( ctx->error != WSLAY_ERR_WOULDBLOCK && ctx->error != 0 ) ) {
                     ctx->write_enabled = 0;
                     return WSLAY_ERR_CALLBACK_FAILURE;
                 }
@@ -851,9 +853,10 @@ int wslay_event_send ( wslay_event_context * ctx )
             iocb.data = ctx->obufmark;
             iocb.data_length = ctx->obuflimit - ctx->obufmark;
             iocb.payload_length = ctx->opayloadlen;
-            r = wslay_frame_send ( ctx->frame_ctx, &iocb );
-            if ( r >= 0 ) {
-                ctx->obufmark += r;
+            size_t length;
+            int16_t result = wslay_frame_send ( ctx->frame_ctx, &iocb, &length );
+            if ( result >= 0 ) {
+                ctx->obufmark += length;
                 if ( ctx->obufmark == ctx->obuflimit ) {
                     ctx->obufmark = ctx->obuflimit = ctx->obuf;
                     if ( ctx->omsg->fin ) {
@@ -867,9 +870,7 @@ int wslay_event_send ( wslay_event_context * ctx )
                     break;
                 }
             } else {
-                if ( r != WSLAY_ERR_WANT_WRITE ||
-                        ( ctx->error != WSLAY_ERR_WOULDBLOCK &&
-                          ctx->error != 0 ) ) {
+                if ( result != WSLAY_ERR_WANT_WRITE || ( ctx->error != WSLAY_ERR_WOULDBLOCK && ctx->error != 0 ) ) {
                     ctx->write_enabled = 0;
                     return WSLAY_ERR_CALLBACK_FAILURE;
                 }
@@ -961,3 +962,4 @@ size_t wslay_event_get_queued_msg_length ( wslay_event_context * ctx )
 {
     return ctx->queued_msg_length;
 }
+
