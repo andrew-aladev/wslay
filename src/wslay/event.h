@@ -28,6 +28,7 @@
 #include "wslay.h"
 #include "frame.h"
 #include "queue.h"
+#include "utf8.h"
 
 struct wslay_event_byte_chunk {
     uint8_t * data;
@@ -44,7 +45,7 @@ struct wslay_event_imsg {
 };
 
 enum wslay_event_msg_type {
-    WSLAY_NON_FRAGMENTED,
+    WSLAY_NON_FRAGMENTED = 0,
     WSLAY_FRAGMENTED
 };
 
@@ -158,8 +159,7 @@ typedef struct wslay_event_context_t {
     uint32_t config;
     // maximum message length that can be received
     uint64_t max_recv_msg_length;
-    // 1 if initialized for server, otherwise 0
-    uint8_t server;
+    bool server;
     // bitwise OR of enum wslay_event_close_status values
     uint8_t close_status;
     // status code in received close control frame
@@ -206,27 +206,6 @@ typedef struct wslay_event_context_t {
     struct wslay_event_frame_user_data frame_user_data;
     void * user_data;
 } wslay_event_context;
-
-/*
- * Initializes ctx as WebSocket Server.
- * user_data is an arbitrary pointer, which is directly passed to each callback functions as user_data argument.
- *
- * On success, returns 0. On error, returns one of following negative values:
- *
- * WSLAY_ERR_NOMEM
- *   Out of memory.
- */
-int wslay_event_context_server_init ( wslay_event_context ** ctx, const struct wslay_event_callbacks * callbacks, void * user_data );
-
-/*
- * Initializes ctx as WebSocket client. user_data is an arbitrary pointer, which is directly passed to each callback functions as user_data argument.
- *
- * On success, returns 0. On error, returns one of following negative values:
- *
- * WSLAY_ERR_NOMEM
- *   Out of memory.
- */
-int wslay_event_context_client_init ( wslay_event_context ** ctx, const struct wslay_event_callbacks * callbacks, void * user_data );
 
 // Releases allocated resources for ctx.
 void wslay_event_context_free ( wslay_event_context * ctx );
@@ -343,7 +322,7 @@ int wslay_event_queue_msg ( wslay_event_context * ctx, const struct wslay_event_
 // Specify "source" to generate message.
 union wslay_event_msg_source {
     int fd;
-    void *data;
+    void * data;
 };
 
 /*
@@ -358,7 +337,7 @@ typedef ssize_t ( *wslay_event_fragmented_msg_callback ) ( wslay_event_context *
 struct wslay_event_omsg {
     uint8_t fin;
     uint8_t opcode;
-    enum wslay_event_msg_type type;
+    uint8_t type;
 
     uint8_t * data;
     size_t data_length;
@@ -480,5 +459,35 @@ size_t wslay_event_get_queued_msg_count ( wslay_event_context * ctx );
 // Returns the sum of queued message length.
 // It only counts the message length queued using wslay_event_queue_msg() or wslay_event_queue_close().
 size_t wslay_event_get_queued_msg_length ( wslay_event_context * ctx );
+
+inline
+void wslay_event_byte_chunk_free ( struct wslay_event_byte_chunk * c )
+{
+    if ( c == NULL ) {
+        return;
+    }
+    free ( c->data );
+    free ( c );
+}
+
+inline
+void wslay_event_imsg_chunks_free ( struct wslay_event_imsg * m )
+{
+    if ( m->chunks == NULL ) {
+        return;
+    }
+    while ( !wslay_queue_is_empty ( m->chunks ) ) {
+        wslay_event_byte_chunk_free ( wslay_queue_top ( m->chunks ) );
+        wslay_queue_pop ( m->chunks );
+    }
+}
+
+inline
+void wslay_event_imsg_reset ( struct wslay_event_imsg * m )
+{
+    m->opcode = 0xff;
+    m->utf8state = UTF8_ACCEPT;
+    wslay_event_imsg_chunks_free ( m );
+}
 
 #endif

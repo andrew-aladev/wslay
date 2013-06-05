@@ -1,5 +1,5 @@
-set (INCLUDES event.h frame.h queue.h stack.h wslay.h)
-set (SOURCES  event.c frame.c queue.c stack.c)
+set (INCLUDES event.h frame.h queue.h wslay.h context.h utf8.h)
+set (SOURCES  event.c frame.c queue.c context.c utf8.c)
 
 if (WSLAY_SHARED MATCHES true)
     add_library (${PROJECT_NAME} SHARED ${SOURCES})

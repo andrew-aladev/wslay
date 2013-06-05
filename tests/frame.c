@@ -33,11 +33,10 @@
 
 void test_wslay_frame_context_init ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks;
     int user_data;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &user_data ) == 0 );
-
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &user_data );
+    CU_ASSERT ( ctx != NULL );
     talloc_free ( ctx );
 }
 
@@ -91,21 +90,24 @@ static ssize_t scripted_send_callback ( const uint8_t* data, size_t len,
 
 void test_wslay_frame_recv ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
     };
     struct scripted_data_feed df;
     struct wslay_frame_iocb iocb;
+    size_t data_length;
     /* Masked text frame containing "Hello" */
     uint8_t msg[] = { 0x81u, 0x85u, 0x37u, 0xfau, 0x21u, 0x3du, 0x7fu, 0x9fu,
                       0x4du, 0x51u, 0x58u
                     };
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
-    wslay_frame_context_init ( NULL, &ctx, &callbacks, &df );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
 
-    CU_ASSERT ( 5 == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+    CU_ASSERT ( data_length == 5 );
     CU_ASSERT_EQUAL ( 1, iocb.fin );
     CU_ASSERT_EQUAL ( 0, iocb.rsv );
     CU_ASSERT_EQUAL ( 0x1, iocb.opcode );
@@ -119,14 +121,11 @@ void test_wslay_frame_recv ( void )
 
 void test_wslay_frame_recv_1byte ( void )
 {
-    wslay_frame_context * ctx;
-    struct wslay_frame_callbacks callbacks = { NULL,
-               scripted_recv_callback,
-               NULL
-    };
+    struct wslay_frame_callbacks callbacks = { NULL, scripted_recv_callback, NULL };
     struct scripted_data_feed df;
     struct wslay_frame_iocb iocb;
     size_t i;
+    size_t data_length;
     /* Masked text frame containing "Hello" */
     uint8_t msg[] = { 0x81u, 0x85u, 0x37u, 0xfau, 0x21u, 0x3du, 0x7fu, 0x9fu,
                       0x4du, 0x51u, 0x58u
@@ -135,13 +134,16 @@ void test_wslay_frame_recv_1byte ( void )
     for ( i = 0; i < sizeof ( msg ); ++i ) {
         df.feedseq[i] = 1;
     }
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
 
     for ( i = 0; i < 4; ++i ) {
-        CU_ASSERT ( WSLAY_ERR_WANT_READ == wslay_frame_recv ( ctx, &iocb ) );
+        CU_ASSERT ( WSLAY_ERR_WANT_READ == wslay_frame_recv ( ctx, &iocb, &data_length ) );
     }
     for ( i = 0; i < 5; ++i ) {
-        CU_ASSERT ( 1 == wslay_frame_recv ( ctx, &iocb ) );
+        CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+        CU_ASSERT ( data_length == 1 );
         CU_ASSERT_EQUAL ( 1, iocb.fin );
         CU_ASSERT_EQUAL ( 0, iocb.rsv );
         CU_ASSERT_EQUAL ( 0x1, iocb.opcode );
@@ -150,18 +152,14 @@ void test_wslay_frame_recv_1byte ( void )
         CU_ASSERT_EQUAL ( 1, iocb.data_length );
         CU_ASSERT_EQUAL ( msg[6 + i]^msg[2 + i % 4], iocb.data[0] );
     }
-    CU_ASSERT ( WSLAY_ERR_WANT_READ == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( WSLAY_ERR_WANT_READ == wslay_frame_recv ( ctx, &iocb, &data_length ) );
 
     talloc_free ( ctx );
 }
 
 void test_wslay_frame_recv_fragmented ( void )
 {
-    wslay_frame_context * ctx;
-    struct wslay_frame_callbacks callbacks = { NULL,
-               scripted_recv_callback,
-               NULL
-    };
+    struct wslay_frame_callbacks callbacks = { NULL, scripted_recv_callback, NULL };
     struct scripted_data_feed df;
     struct wslay_frame_iocb iocb;
     /* Unmasked message */
@@ -171,9 +169,13 @@ void test_wslay_frame_recv_fragmented ( void )
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
     df.feedseq[0] = 5;
     df.feedseq[1] = 4;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
+    size_t data_length;
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
 
-    CU_ASSERT ( 3 == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+    CU_ASSERT ( data_length == 3 );
     CU_ASSERT_EQUAL ( 0, iocb.fin );
     CU_ASSERT_EQUAL ( 0, iocb.rsv );
     CU_ASSERT_EQUAL ( WSLAY_TEXT_FRAME, iocb.opcode );
@@ -182,7 +184,8 @@ void test_wslay_frame_recv_fragmented ( void )
     CU_ASSERT_EQUAL ( 3, iocb.data_length );
     CU_ASSERT ( memcmp ( "Hel", iocb.data, iocb.data_length ) == 0 );
 
-    CU_ASSERT ( 2 == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+    CU_ASSERT ( data_length == 2 );
     CU_ASSERT_EQUAL ( 1, iocb.fin );
     CU_ASSERT_EQUAL ( 0, iocb.rsv );
     CU_ASSERT_EQUAL ( WSLAY_CONTINUATION_FRAME, iocb.opcode );
@@ -196,7 +199,6 @@ void test_wslay_frame_recv_fragmented ( void )
 
 void test_wslay_frame_recv_interleaved_ctrl_frame ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -211,11 +213,15 @@ void test_wslay_frame_recv_interleaved_ctrl_frame ( void )
                     }; /* "lo" */
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
     df.feedseq[0] = 5;
-    df.feedseq[1] = 7,
-                    df.feedseq[2] = 4;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
+    df.feedseq[1] = 7;
+    df.feedseq[2] = 4;
+    size_t data_length;
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
 
-    CU_ASSERT ( 3 == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+    CU_ASSERT ( data_length == 3 );
     CU_ASSERT_EQUAL ( 0, iocb.fin );
     CU_ASSERT_EQUAL ( 0, iocb.rsv );
     CU_ASSERT_EQUAL ( WSLAY_TEXT_FRAME, iocb.opcode );
@@ -224,7 +230,8 @@ void test_wslay_frame_recv_interleaved_ctrl_frame ( void )
     CU_ASSERT_EQUAL ( 3, iocb.data_length );
     CU_ASSERT ( memcmp ( "Hel", iocb.data, iocb.data_length ) == 0 );
 
-    CU_ASSERT ( 5 == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+    CU_ASSERT ( data_length == 5 );
     CU_ASSERT_EQUAL ( 1, iocb.fin );
     CU_ASSERT_EQUAL ( 0, iocb.rsv );
     CU_ASSERT_EQUAL ( WSLAY_PING, iocb.opcode );
@@ -233,7 +240,8 @@ void test_wslay_frame_recv_interleaved_ctrl_frame ( void )
     CU_ASSERT_EQUAL ( 5, iocb.data_length );
     CU_ASSERT ( memcmp ( "Hello", iocb.data, iocb.data_length ) == 0 );
 
-    CU_ASSERT ( 2 == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+    CU_ASSERT ( data_length == 2 );
     CU_ASSERT_EQUAL ( 1, iocb.fin );
     CU_ASSERT_EQUAL ( 0, iocb.rsv );
     CU_ASSERT_EQUAL ( WSLAY_CONTINUATION_FRAME, iocb.opcode );
@@ -247,20 +255,20 @@ void test_wslay_frame_recv_interleaved_ctrl_frame ( void )
 
 void test_wslay_frame_recv_zero_payloadlen ( void )
 {
-    wslay_frame_context * ctx;
-    struct wslay_frame_callbacks callbacks = { NULL,
-               scripted_recv_callback,
-               NULL
-    };
+    struct wslay_frame_callbacks callbacks = { NULL, scripted_recv_callback, NULL };
     struct scripted_data_feed df;
     struct wslay_frame_iocb iocb;
     /* Unmasked message */
     uint8_t msg[] = { 0x81, 0x00 }; /* "" */
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
     df.feedseq[0] = 2;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
+    size_t data_length;
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
 
-    CU_ASSERT ( 0 == wslay_frame_recv ( ctx, &iocb ) );
+    CU_ASSERT ( wslay_frame_recv ( ctx, &iocb, &data_length ) == 0 );
+    CU_ASSERT ( data_length == 0 );
     CU_ASSERT_EQUAL ( 1, iocb.fin );
     CU_ASSERT_EQUAL ( 0, iocb.rsv );
     CU_ASSERT_EQUAL ( WSLAY_TEXT_FRAME, iocb.opcode );
@@ -273,25 +281,24 @@ void test_wslay_frame_recv_zero_payloadlen ( void )
 
 void test_wslay_frame_recv_too_large_payload ( void )
 {
-    wslay_frame_context * ctx;
-    struct wslay_frame_callbacks callbacks = { NULL,
-               scripted_recv_callback,
-               NULL
-    };
+    struct wslay_frame_callbacks callbacks = { NULL, scripted_recv_callback, NULL };
     struct scripted_data_feed df;
     struct wslay_frame_iocb iocb;
     uint8_t msg[] = { 0x81, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
     df.feedseq[0] = sizeof ( msg );
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
-    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb ) );
+    size_t data_length;
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
+    
+    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb, &data_length ) );
 
     talloc_free ( ctx );
 }
 
 void test_wslay_frame_recv_ctrl_frame_too_large_payload ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -301,33 +308,36 @@ void test_wslay_frame_recv_ctrl_frame_too_large_payload ( void )
     uint8_t msg[] = { 0x88, 0x7e };
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
     df.feedseq[0] = sizeof ( msg );
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
-    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb ) );
+    size_t data_length;
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
+    
+    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb, &data_length ) );
 
     talloc_free ( ctx );
 }
 
 void test_wslay_frame_recv_minimum_ext_payload16 ( void )
 {
-    wslay_frame_context * ctx;
-    struct wslay_frame_callbacks callbacks = { NULL,
-               scripted_recv_callback,
-               NULL
-    };
+    struct wslay_frame_callbacks callbacks = { NULL, scripted_recv_callback, NULL };
     struct scripted_data_feed df;
     struct wslay_frame_iocb iocb;
     uint8_t msg[] = { 0x81, 0x7e, 0x00, 0x7d };
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
     df.feedseq[0] = sizeof ( msg );
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
-    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb ) );
+    size_t data_length;
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
+    
+    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb, &data_length ) );
 
     talloc_free ( ctx );
 }
 
 void test_wslay_frame_recv_minimum_ext_payload64 ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { NULL,
                scripted_recv_callback,
                NULL
@@ -337,8 +347,12 @@ void test_wslay_frame_recv_minimum_ext_payload64 ( void )
     uint8_t msg[] = { 0x81, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff};
     scripted_data_feed_init ( &df, msg, sizeof ( msg ) );
     df.feedseq[0] = sizeof ( msg );
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
-    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb ) );
+    size_t data_length;
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
+    
+    CU_ASSERT_EQUAL ( WSLAY_ERR_PROTO, wslay_frame_recv ( ctx, &iocb, &data_length ) );
 
     talloc_free ( ctx );
 }
@@ -348,8 +362,7 @@ struct accumulator {
     size_t length;
 };
 
-static ssize_t accumulator_send_callback ( const uint8_t *buf, size_t len,
-        int flags, void* user_data )
+static ssize_t accumulator_send_callback ( const uint8_t *buf, size_t len, int flags, void * user_data )
 {
     struct accumulator *acc = ( struct accumulator* ) user_data;
     assert ( acc->length + len < sizeof ( acc->buf ) );
@@ -358,8 +371,7 @@ static ssize_t accumulator_send_callback ( const uint8_t *buf, size_t len,
     return len;
 }
 
-static int static_genmask_callback ( uint8_t *buf, size_t len,
-                                     void* user_data )
+static int static_genmask_callback ( uint8_t *buf, size_t len, void * user_data )
 {
     static const uint8_t makskey[] = { 0x37u, 0xfau, 0x21u, 0x3du };
     memcpy ( buf, makskey, 4 );
@@ -368,18 +380,17 @@ static int static_genmask_callback ( uint8_t *buf, size_t len,
 
 void test_wslay_frame_send ( void )
 {
-    wslay_frame_context * ctx;
-    struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
-               NULL,
-               static_genmask_callback
-    };
+    struct wslay_frame_callbacks callbacks = { accumulator_send_callback, NULL, static_genmask_callback };
     struct accumulator acc;
     struct wslay_frame_iocb iocb;
     /* Masked text frame containing "Hello" */
     uint8_t msg[] = { 0x81u, 0x85u, 0x37u, 0xfau, 0x21u, 0x3du, 0x7fu, 0x9fu,
                       0x4du, 0x51u, 0x58u
                     };
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &acc ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &acc );
+    CU_ASSERT ( ctx != NULL );
+    
     memset ( &iocb, 0, sizeof ( iocb ) );
     acc.length = 0;
     iocb.fin = 1;
@@ -399,7 +410,6 @@ void test_wslay_frame_send ( void )
 
 void test_wslay_frame_send_fragmented ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
                NULL,
                static_genmask_callback
@@ -409,7 +419,10 @@ void test_wslay_frame_send_fragmented ( void )
     /* Unmasked message */
     uint8_t msg1[] = { 0x01, 0x03, 0x48, 0x65, 0x6c }; /* "Hel" */
     uint8_t msg2[] = { 0x80, 0x02, 0x6c, 0x6f }; /* "lo" */
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &acc ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &acc );
+    CU_ASSERT ( ctx != NULL );
+    
     memset ( &iocb, 0, sizeof ( iocb ) );
     acc.length = 0;
     iocb.fin = 0;
@@ -440,7 +453,6 @@ void test_wslay_frame_send_fragmented ( void )
 
 void test_wslay_frame_send_interleaved_ctrl_frame ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
                NULL,
                static_genmask_callback
@@ -455,7 +467,10 @@ void test_wslay_frame_send_interleaved_ctrl_frame ( void )
     /* text with "lo", continuation frame for msg1, with fin = 1 */
     uint8_t msg3[] = { 0x80, 0x02, 0x6c, 0x6f };
     size_t length;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &acc ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &acc );
+    CU_ASSERT ( ctx != NULL );
+    
     memset ( &iocb, 0, sizeof ( iocb ) );
     acc.length = 0;
     iocb.fin = 0;
@@ -496,7 +511,6 @@ void test_wslay_frame_send_interleaved_ctrl_frame ( void )
 
 void test_wslay_frame_send_1byte_masked ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { scripted_send_callback,
                NULL,
                static_genmask_callback
@@ -514,7 +528,10 @@ void test_wslay_frame_send_1byte_masked ( void )
     for ( i = 0; i < sizeof ( msg ); ++i ) {
         df.feedseq[i] = 1;
     }
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &df ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &df );
+    CU_ASSERT ( ctx != NULL );
+    
     memset ( &iocb, 0, sizeof ( iocb ) );
     iocb.fin = 1;
     iocb.opcode = WSLAY_TEXT_FRAME;
@@ -533,7 +550,6 @@ void test_wslay_frame_send_1byte_masked ( void )
 
 void test_wslay_frame_send_zero_payloadlen ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks = { accumulator_send_callback,
                NULL,
                static_genmask_callback
@@ -544,7 +560,10 @@ void test_wslay_frame_send_zero_payloadlen ( void )
     uint8_t msg[] = { 0x81, 0x00 }; /* "" */
     size_t length;
     acc.length = 0;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, &acc ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, &acc );
+    CU_ASSERT ( ctx != NULL );
+    
     memset ( &iocb, 0, sizeof ( iocb ) );
     iocb.fin = 1;
     iocb.opcode = WSLAY_TEXT_FRAME;
@@ -561,11 +580,13 @@ void test_wslay_frame_send_zero_payloadlen ( void )
 
 void test_wslay_frame_send_too_large_payload ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks;
     struct wslay_frame_iocb iocb;
     size_t length;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, NULL ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, NULL );
+    CU_ASSERT ( ctx != NULL );
+    
     memset ( &iocb, 0, sizeof ( iocb ) );
     iocb.fin = 1;
     iocb.opcode = WSLAY_TEXT_FRAME;
@@ -578,11 +599,13 @@ void test_wslay_frame_send_too_large_payload ( void )
 
 void test_wslay_frame_send_ctrl_frame_too_large_payload ( void )
 {
-    wslay_frame_context * ctx;
     struct wslay_frame_callbacks callbacks;
     struct wslay_frame_iocb iocb;
     size_t length;
-    CU_ASSERT ( wslay_frame_context_init ( NULL, &ctx, &callbacks, NULL ) == 0 );
+    
+    wslay_frame_context * ctx = wslay_frame_context_new ( NULL, &callbacks, NULL );
+    CU_ASSERT ( ctx != NULL );
+    
     memset ( &iocb, 0, sizeof ( iocb ) );
     iocb.fin = 1;
     iocb.opcode = WSLAY_PING;

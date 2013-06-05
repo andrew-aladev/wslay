@@ -1,4 +1,4 @@
-set (SOURCES main.c event.c frame.c queue.c stack.c)
+set (SOURCES main.c event.c frame.c queue.c)
 
 if (WSLAY_SHARED MATCHES true)
     add_executable (main ${SOURCES})

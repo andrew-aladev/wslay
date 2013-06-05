@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <sys/types.h>
 
 enum wslay_error {
@@ -131,8 +132,7 @@ struct wslay_frame_iocb {
     uint8_t opcode;
     // payload length [0, 2**63-1]
     uint64_t payload_length;
-    // 1 for masked frame, 0 for unmasked
-    uint8_t mask;
+    bool mask;
     // part of payload data
     const uint8_t *data;
     // bytes of data defined above

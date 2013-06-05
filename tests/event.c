@@ -27,6 +27,7 @@
 #include <CUnit/CUnit.h>
 
 #include <wslay/event.h>
+#include <wslay/context.h>
 #include "event.h"
 
 struct scripted_data_feed {
@@ -121,7 +122,6 @@ static ssize_t fail_send_callback ( wslay_event_context * ctx, const uint8_t *bu
 
 void test_wslay_event_send_fragmented_msg ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -139,7 +139,9 @@ void test_wslay_event_send_fragmented_msg ( void )
     callbacks.send_callback = accumulator_send_callback;
     memset ( &acc, 0, sizeof ( acc ) );
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
 
     memset ( &arg, 0, sizeof ( arg ) );
     arg.opcode = WSLAY_TEXT_FRAME;
@@ -149,13 +151,13 @@ void test_wslay_event_send_fragmented_msg ( void )
     CU_ASSERT ( 0 == wslay_event_send ( ctx ) );
     CU_ASSERT_EQUAL ( 9, acc.length );
     CU_ASSERT ( 0 == memcmp ( ans, acc.buf, acc.length ) );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_send_fragmented_msg_with_ctrl ( void )
 {
     int i;
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -175,7 +177,9 @@ void test_wslay_event_send_fragmented_msg_with_ctrl ( void )
     callbacks.send_callback = one_accumulator_send_callback;
     memset ( &acc, 0, sizeof ( acc ) );
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
 
     memset ( &arg, 0, sizeof ( arg ) );
     arg.opcode = WSLAY_TEXT_FRAME;
@@ -197,12 +201,12 @@ void test_wslay_event_send_fragmented_msg_with_ctrl ( void )
     CU_ASSERT ( 0 == wslay_event_get_queued_msg_count ( ctx ) );
     CU_ASSERT ( 11 == acc.length );
     CU_ASSERT ( 0 == memcmp ( ans, acc.buf, acc.length ) );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_send_ctrl_msg_first ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -216,7 +220,9 @@ void test_wslay_event_send_ctrl_msg_first ( void )
     callbacks.send_callback = accumulator_send_callback;
     memset ( &acc, 0, sizeof ( acc ) );
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
 
     memset ( &arg, 0, sizeof ( arg ) );
     arg.opcode = WSLAY_PING;
@@ -229,12 +235,12 @@ void test_wslay_event_send_ctrl_msg_first ( void )
     CU_ASSERT ( 0 == wslay_event_send ( ctx ) );
     CU_ASSERT ( 9 == acc.length );
     CU_ASSERT ( 0 == memcmp ( ans, acc.buf, acc.length ) );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_queue_close ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -246,19 +252,21 @@ void test_wslay_event_queue_close ( void )
     callbacks.send_callback = accumulator_send_callback;
     memset ( &acc, 0, sizeof ( acc ) );
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
-    CU_ASSERT ( 0 == wslay_event_queue_close ( ctx, WSLAY_CODE_MESSAGE_TOO_BIG,
-                ( const uint8_t* ) msg, 1 ) );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
+    CU_ASSERT ( 0 == wslay_event_queue_close ( ctx, WSLAY_CODE_MESSAGE_TOO_BIG, ( const uint8_t* ) msg, 1 ) );
     CU_ASSERT ( 0 == wslay_event_send ( ctx ) );
     CU_ASSERT ( 5 == acc.length );
     CU_ASSERT ( 0 == memcmp ( ans, acc.buf, acc.length ) );
     CU_ASSERT ( 1 == wslay_event_get_close_sent ( ctx ) );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_queue_close_without_code ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -268,7 +276,10 @@ void test_wslay_event_queue_close_without_code ( void )
     callbacks.send_callback = accumulator_send_callback;
     memset ( &acc, 0, sizeof ( acc ) );
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     CU_ASSERT ( 0 == wslay_event_queue_msg ( ctx, &ping ) );
     /* See that ping is not sent because close frame is queued */
     CU_ASSERT ( 0 == wslay_event_queue_close ( ctx, 0, NULL, 0 ) );
@@ -276,14 +287,13 @@ void test_wslay_event_queue_close_without_code ( void )
     CU_ASSERT ( 2 == acc.length );
     CU_ASSERT ( 0 == memcmp ( ans, acc.buf, acc.length ) );
     CU_ASSERT ( 1 == wslay_event_get_close_sent ( ctx ) );
-    CU_ASSERT ( WSLAY_CODE_NO_STATUS_RCVD ==
-                wslay_event_get_status_code_sent ( ctx ) );
-    wslay_event_context_free ( ctx );
+    CU_ASSERT ( WSLAY_CODE_NO_STATUS_RCVD == wslay_event_get_status_code_sent ( ctx ) );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_recv_close_without_code ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     const uint8_t msg[] = { 0x88u, 0x00 };
@@ -292,17 +302,19 @@ void test_wslay_event_recv_close_without_code ( void )
     memset ( &callbacks, 0, sizeof ( callbacks ) );
     callbacks.recv_callback = scripted_recv_callback;
     ud.df = &df;
-    wslay_event_context_client_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_client_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     CU_ASSERT ( 0 == wslay_event_recv ( ctx ) );
     CU_ASSERT ( 1 == wslay_event_get_close_received ( ctx ) );
-    CU_ASSERT ( WSLAY_CODE_NO_STATUS_RCVD ==
-                wslay_event_get_status_code_received ( ctx ) );
-    wslay_event_context_free ( ctx );
+    CU_ASSERT ( WSLAY_CODE_NO_STATUS_RCVD == wslay_event_get_status_code_received ( ctx ) );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_reply_close ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -323,7 +335,10 @@ void test_wslay_event_reply_close ( void )
     memset ( &acc, 0, sizeof ( acc ) );
     ud.df = &df;
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     CU_ASSERT ( 0 == wslay_event_recv ( ctx ) );
     CU_ASSERT ( 1 == wslay_event_get_queued_msg_count ( ctx ) );
     /* 7 bytes = 2 bytes status code + "Hello" */
@@ -343,32 +358,39 @@ void test_wslay_event_reply_close ( void )
                 wslay_event_get_status_code_received ( ctx ) );
     CU_ASSERT ( WSLAY_CODE_MESSAGE_TOO_BIG ==
                 wslay_event_get_status_code_sent ( ctx ) );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_no_more_msg ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     memset ( &callbacks, 0, sizeof ( callbacks ) );
-    wslay_event_context_server_init ( &ctx, &callbacks, NULL );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, NULL );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     CU_ASSERT ( wslay_event_queue_close ( ctx, 0, NULL, 0 ) == 0 );
     CU_ASSERT ( wslay_event_queue_close ( ctx, 0, NULL, 0 ) != 0 );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_callback_failure ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     memset ( &callbacks, 0, sizeof ( callbacks ) );
     callbacks.recv_callback = fail_recv_callback;
     callbacks.send_callback = fail_send_callback;
-    wslay_event_context_server_init ( &ctx, &callbacks, NULL );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, NULL );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     CU_ASSERT ( WSLAY_ERR_CALLBACK_FAILURE == wslay_event_recv ( ctx ) );
     /* close control frame is in queue */
     CU_ASSERT ( WSLAY_ERR_CALLBACK_FAILURE == wslay_event_send ( ctx ) );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 static void no_buffering_callback ( wslay_event_context * ctx, const struct wslay_event_on_msg_recv_arg *arg, void *user_data )
@@ -384,7 +406,6 @@ static void no_buffering_callback ( wslay_event_context * ctx, const struct wsla
 
 void test_wslay_event_no_buffering ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     const uint8_t msg[] = {
@@ -398,17 +419,20 @@ void test_wslay_event_no_buffering ( void )
     ud.df = &df;
     callbacks.recv_callback = scripted_recv_callback;
     callbacks.on_msg_recv_callback = no_buffering_callback;
-    wslay_event_context_client_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_client_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     wslay_event_config_set_no_buffering ( ctx, 1 );
     CU_ASSERT ( 0 == wslay_event_recv ( ctx ) );
     /* pong must be queued */
     CU_ASSERT ( wslay_event_want_write ( ctx ) );
-    wslay_event_context_free ( ctx );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_frame_too_big ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -427,21 +451,23 @@ void test_wslay_event_frame_too_big ( void )
     memset ( &acc, 0, sizeof ( acc ) );
     ud.df = &df;
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     wslay_event_config_set_max_recv_msg_length ( ctx, 4 );
     CU_ASSERT ( 0 == wslay_event_recv ( ctx ) );
     CU_ASSERT ( 0 == wslay_event_send ( ctx ) );
     CU_ASSERT ( 4 == acc.length );
     CU_ASSERT ( 0 == memcmp ( ans, acc.buf, acc.length ) );
     CU_ASSERT ( 1 == wslay_event_get_close_sent ( ctx ) );
-    CU_ASSERT ( WSLAY_CODE_MESSAGE_TOO_BIG ==
-                wslay_event_get_status_code_sent ( ctx ) );
-    wslay_event_context_free ( ctx );
+    CU_ASSERT ( WSLAY_CODE_MESSAGE_TOO_BIG == wslay_event_get_status_code_sent ( ctx ) );
+
+    talloc_free ( ctx );
 }
 
 void test_wslay_event_message_too_big ( void )
 {
-    wslay_event_context * ctx;
     struct wslay_event_callbacks callbacks;
     struct my_user_data ud;
     struct accumulator acc;
@@ -462,14 +488,17 @@ void test_wslay_event_message_too_big ( void )
     memset ( &acc, 0, sizeof ( acc ) );
     ud.df = &df;
     ud.acc = &acc;
-    wslay_event_context_server_init ( &ctx, &callbacks, &ud );
+
+    wslay_event_context * ctx = wslay_server_new ( NULL, &callbacks, &ud );
+    CU_ASSERT_FATAL ( ctx != NULL );
+
     wslay_event_config_set_max_recv_msg_length ( ctx, 9 );
     CU_ASSERT ( 0 == wslay_event_recv ( ctx ) );
     CU_ASSERT ( 0 == wslay_event_send ( ctx ) );
     CU_ASSERT ( 4 == acc.length );
     CU_ASSERT ( 0 == memcmp ( ans, acc.buf, acc.length ) );
     CU_ASSERT ( 1 == wslay_event_get_close_sent ( ctx ) );
-    CU_ASSERT ( WSLAY_CODE_MESSAGE_TOO_BIG ==
-                wslay_event_get_status_code_sent ( ctx ) );
-    wslay_event_context_free ( ctx );
+    CU_ASSERT ( WSLAY_CODE_MESSAGE_TOO_BIG == wslay_event_get_status_code_sent ( ctx ) );
+
+    talloc_free ( ctx );
 }

@@ -31,25 +31,10 @@
 
 #include "frame.h"
 
-#include <talloc2/tree.h>
-
 #define wslay_min(A, B) (((A) < (B)) ? (A) : (B))
 
-uint8_t wslay_frame_context_init ( void * ctx, wslay_frame_context ** frame_ctx_ptr, const struct wslay_frame_callbacks * callbacks, void * user_data )
-{
-    wslay_frame_context * frame_ctx = talloc_zero ( ctx, sizeof ( wslay_frame_context ) );
-    if ( frame_ctx == NULL ) {
-        return 1;
-    }
-    frame_ctx->istate    = RECV_HEADER1;
-    frame_ctx->ireqread  = 2;
-    frame_ctx->ostate    = PREP_HEADER;
-    frame_ctx->user_data = user_data;
-    frame_ctx->ibufmark  = frame_ctx->ibuflimit = frame_ctx->ibuf;
-    frame_ctx->callbacks = * callbacks;
-    * frame_ctx_ptr = frame_ctx;
-    return 0;
-}
+extern inline
+wslay_frame_context * wslay_frame_context_new ( void * ctx, const struct wslay_frame_callbacks * callbacks, void * user_data );
 
 int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb, size_t * length )
 {
@@ -182,7 +167,8 @@ int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
     return WSLAY_ERR_INVALID_ARGUMENT;
 }
 
-static void wslay_shift_ibuf ( wslay_frame_context * ctx )
+static inline
+void wslay_shift_ibuf ( wslay_frame_context * ctx )
 {
     ptrdiff_t len = ctx->ibuflimit - ctx->ibufmark;
     memmove ( ctx->ibuf, ctx->ibufmark, len );
@@ -190,31 +176,32 @@ static void wslay_shift_ibuf ( wslay_frame_context * ctx )
     ctx->ibufmark = ctx->ibuf;
 }
 
-static ssize_t wslay_recv ( wslay_frame_context * ctx )
+static inline
+int16_t wslay_recv ( wslay_frame_context * ctx )
 {
-    ssize_t r;
     if ( ctx->ibufmark != ctx->ibuf ) {
         wslay_shift_ibuf ( ctx );
     }
-    r = ctx->callbacks.recv_callback ( ctx->ibuflimit, ctx->ibuf + sizeof ( ctx->ibuf ) - ctx->ibuflimit, 0, ctx->user_data );
-    if ( r > 0 ) {
-        ctx->ibuflimit += r;
+    ssize_t result;
+    result = ctx->callbacks.recv_callback ( ctx->ibuflimit, ctx->ibuf + sizeof ( ctx->ibuf ) - ctx->ibuflimit, 0, ctx->user_data );
+    if ( result > 0 ) {
+        ctx->ibuflimit += result;
     } else {
-        r = WSLAY_ERR_WANT_READ;
+        return WSLAY_ERR_WANT_READ;
     }
-    return r;
+    return 0;
 }
 
 #define WSLAY_AVAIL_IBUF(ctx) ((size_t)(ctx->ibuflimit - ctx->ibufmark))
 
-ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb )
+int16_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb, size_t * data_length_ptr )
 {
-    ssize_t r;
+    int16_t result;
     if ( ctx->istate == RECV_HEADER1 ) {
         uint8_t fin, opcode, rsv, payloadlen;
         if ( WSLAY_AVAIL_IBUF ( ctx ) < ctx->ireqread ) {
-            if ( ( r = wslay_recv ( ctx ) ) <= 0 ) {
-                return r;
+            if ( ( result = wslay_recv ( ctx ) ) < 0 ) {
+                return result;
             }
         }
         if ( WSLAY_AVAIL_IBUF ( ctx ) < ctx->ireqread ) {
@@ -250,10 +237,11 @@ ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
             }
         }
     }
+
     if ( ctx->istate == RECV_EXT_PAYLOADLEN ) {
         if ( WSLAY_AVAIL_IBUF ( ctx ) < ctx->ireqread ) {
-            if ( ( r = wslay_recv ( ctx ) ) <= 0 ) {
-                return r;
+            if ( ( result = wslay_recv ( ctx ) ) < 0 ) {
+                return result;
             }
             if ( WSLAY_AVAIL_IBUF ( ctx ) < ctx->ireqread ) {
                 return WSLAY_ERR_WANT_READ;
@@ -261,13 +249,11 @@ ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
         }
         ctx->ipayloadlen = 0;
         ctx->ipayloadoff = 0;
-        memcpy ( ( uint8_t* ) &ctx->ipayloadlen + ( 8 - ctx->ireqread ),
-                 ctx->ibufmark, ctx->ireqread );
+        memcpy ( ( uint8_t* ) &ctx->ipayloadlen + ( 8 - ctx->ireqread ), ctx->ibufmark, ctx->ireqread );
         ctx->ipayloadlen = be64toh ( ctx->ipayloadlen );
         ctx->ibufmark += ctx->ireqread;
         if ( ctx->ireqread == 8 ) {
-            if ( ctx->ipayloadlen < ( 1 << 16 ) ||
-                    ctx->ipayloadlen & ( 1ull << 63 ) ) {
+            if ( ctx->ipayloadlen < ( 1 << 16 ) || ctx->ipayloadlen & ( 1ull << 63 ) ) {
                 return WSLAY_ERR_PROTO;
             }
         } else if ( ctx->ipayloadlen < 126 ) {
@@ -280,10 +266,11 @@ ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
             ctx->istate = RECV_PAYLOAD;
         }
     }
+
     if ( ctx->istate == RECV_MASKKEY ) {
         if ( WSLAY_AVAIL_IBUF ( ctx ) < ctx->ireqread ) {
-            if ( ( r = wslay_recv ( ctx ) ) <= 0 ) {
-                return r;
+            if ( ( result = wslay_recv ( ctx ) ) < 0 ) {
+                return result;
             }
             if ( WSLAY_AVAIL_IBUF ( ctx ) < ctx->ireqread ) {
                 return WSLAY_ERR_WANT_READ;
@@ -293,38 +280,45 @@ ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
         ctx->ibufmark += 4;
         ctx->istate = RECV_PAYLOAD;
     }
+
     if ( ctx->istate == RECV_PAYLOAD ) {
         uint8_t *readlimit, *readmark;
         uint64_t rempayloadlen = ctx->ipayloadlen - ctx->ipayloadoff;
         if ( WSLAY_AVAIL_IBUF ( ctx ) == 0 && rempayloadlen > 0 ) {
-            if ( ( r = wslay_recv ( ctx ) ) <= 0 ) {
-                return r;
+            if ( ( result = wslay_recv ( ctx ) ) < 0 ) {
+                return result;
             }
         }
         readmark = ctx->ibufmark;
-        readlimit = WSLAY_AVAIL_IBUF ( ctx ) < rempayloadlen ?
-                    ctx->ibuflimit : ctx->ibufmark + rempayloadlen;
+        if ( WSLAY_AVAIL_IBUF ( ctx ) < rempayloadlen ) {
+            readlimit = ctx->ibuflimit;
+        } else {
+            readlimit = ctx->ibufmark + rempayloadlen;
+        }
         if ( ctx->imask ) {
-            for ( ; ctx->ibufmark != readlimit;
-                    ++ctx->ibufmark, ++ctx->ipayloadoff ) {
+            for ( ; ctx->ibufmark != readlimit; ++ctx->ibufmark, ++ctx->ipayloadoff ) {
                 ctx->ibufmark[0] ^= ctx->imaskkey[ctx->ipayloadoff % 4];
             }
         } else {
             ctx->ibufmark = readlimit;
             ctx->ipayloadoff += readlimit - readmark;
         }
-        iocb->fin = ctx->iom.fin;
-        iocb->rsv = ctx->iom.rsv;
-        iocb->opcode = ctx->iom.opcode;
+
+        iocb->fin            = ctx->iom.fin;
+        iocb->rsv            = ctx->iom.rsv;
+        iocb->opcode         = ctx->iom.opcode;
         iocb->payload_length = ctx->ipayloadlen;
-        iocb->mask = ctx->imask;
-        iocb->data = readmark;
-        iocb->data_length = ctx->ibufmark - readmark;
+        iocb->mask           = ctx->imask;
+        iocb->data           = readmark;
+        iocb->data_length    = ctx->ibufmark - readmark;
+
         if ( ctx->ipayloadlen == ctx->ipayloadoff ) {
             ctx->istate = RECV_HEADER1;
             ctx->ireqread = 2;
         }
-        return iocb->data_length;
+
+        * data_length_ptr = iocb->data_length;
+        return 0;
     }
     return WSLAY_ERR_INVALID_ARGUMENT;
 }

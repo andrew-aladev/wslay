@@ -27,8 +27,10 @@
 
 #include "wslay.h"
 
+#include <talloc2/tree.h>
+
 enum wslay_frame_state {
-    PREP_HEADER,
+    PREP_HEADER = 0,
     SEND_HEADER,
     SEND_PAYLOAD,
     RECV_HEADER1,
@@ -53,7 +55,7 @@ typedef struct wslay_frame_context_t {
     uint64_t ipayloadoff;
     uint8_t imask;
     uint8_t imaskkey[4];
-    enum wslay_frame_state istate;
+    uint8_t istate;
     size_t ireqread;
 
     uint8_t oheader[14];
@@ -63,10 +65,10 @@ typedef struct wslay_frame_context_t {
     uint64_t opayloadoff;
     uint8_t omask;
     uint8_t omaskkey[4];
-    enum wslay_frame_state ostate;
+    uint8_t ostate;
 
     struct wslay_frame_callbacks callbacks;
-    void *user_data;
+    void * user_data;
 } wslay_frame_context;
 
 /*
@@ -75,7 +77,25 @@ typedef struct wslay_frame_context_t {
  * The callback functions specified in callbacks are copied to ctx.
  * user_data is stored in ctx and it will be passed to callback functions.
  */
-uint8_t wslay_frame_context_init ( void * ctx, wslay_frame_context ** result_frame_ctx, const struct wslay_frame_callbacks * callbacks, void * user_data );
+
+inline
+wslay_frame_context * wslay_frame_context_new ( void * ctx, const struct wslay_frame_callbacks * callbacks, void * user_data )
+{
+    wslay_frame_context * frame_ctx = talloc_zero ( ctx, sizeof ( wslay_frame_context ) );
+    if ( frame_ctx == NULL ) {
+        return NULL;
+    }
+    frame_ctx->istate    = RECV_HEADER1;
+    frame_ctx->ireqread  = 2;
+    frame_ctx->ostate    = PREP_HEADER;
+    frame_ctx->user_data = user_data;
+    frame_ctx->ibufmark  = frame_ctx->ibuflimit = frame_ctx->ibuf;
+    frame_ctx->callbacks = * callbacks;
+    
+    frame_ctx->oheadermark  = NULL;
+    frame_ctx->oheaderlimit = NULL;
+    return frame_ctx;
+}
 
 /*
  * Send WebSocket frame specified in iocb.
@@ -120,6 +140,6 @@ int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
  * If there are remaining data to be received, call this function again.
  * This function ensures frame alignment.
  */
-ssize_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb );
+int16_t wslay_frame_recv ( wslay_frame_context * ctx, struct wslay_frame_iocb * iocb, size_t * data_length_ptr );
 
 #endif
