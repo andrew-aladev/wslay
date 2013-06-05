@@ -207,9 +207,6 @@ typedef struct wslay_event_context_t {
     void * user_data;
 } wslay_event_context;
 
-// Releases allocated resources for ctx.
-void wslay_event_context_free ( wslay_event_context * ctx );
-
 /*
  * Enables or disables buffering of an entire message for non-control frames.
  * If val is 0, buffering is enabled. Otherwise, buffering is disabled.
@@ -461,33 +458,11 @@ size_t wslay_event_get_queued_msg_count ( wslay_event_context * ctx );
 size_t wslay_event_get_queued_msg_length ( wslay_event_context * ctx );
 
 inline
-void wslay_event_byte_chunk_free ( struct wslay_event_byte_chunk * c )
-{
-    if ( c == NULL ) {
-        return;
-    }
-    free ( c->data );
-    free ( c );
-}
-
-inline
-void wslay_event_imsg_chunks_free ( struct wslay_event_imsg * m )
-{
-    if ( m->chunks == NULL ) {
-        return;
-    }
-    while ( !wslay_queue_is_empty ( m->chunks ) ) {
-        wslay_event_byte_chunk_free ( wslay_queue_top ( m->chunks ) );
-        wslay_queue_pop ( m->chunks );
-    }
-}
-
-inline
 void wslay_event_imsg_reset ( struct wslay_event_imsg * m )
 {
     m->opcode = 0xff;
     m->utf8state = UTF8_ACCEPT;
-    wslay_event_imsg_chunks_free ( m );
+    talloc_free ( m->chunks );
 }
 
 #endif
