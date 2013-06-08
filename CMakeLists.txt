@@ -16,7 +16,7 @@ set (CMAKE_BUILD_TYPE DEBUG)
 
 enable_testing ()
 
-set (TALLOC_TARGET wslay-talloc2)
+set (TALLOC_TARGET wslay_talloc2)
 add_subdirectory (talloc2)
 include_directories ("talloc2/src/")
 
