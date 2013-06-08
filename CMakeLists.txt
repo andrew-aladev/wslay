@@ -8,10 +8,15 @@ if (NOT DEFINED WSLAY_SHARED)
     set (WSLAY_SHARED true)
 endif ()
 
+if (NOT DEFINED WSLAY_TARGET)
+    set (WSLAY_TARGET ${PROJECT_NAME})
+endif ()
+
 set (CMAKE_BUILD_TYPE DEBUG)
 
 enable_testing ()
 
+set (TALLOC_TARGET wslay-talloc2)
 add_subdirectory (talloc2)
 include_directories ("talloc2/src/")
 
