@@ -175,7 +175,7 @@ int wslay_event_queue_close ( wslay_event_context * ctx, uint16_t status_code, c
 
     uint8_t msg[128];
     size_t msg_length;
-    struct wslay_event_msg arg;
+    wslay_event_msg arg;
     uint16_t ncode;
     int r;
     if ( status_code == 0 ) {
@@ -207,7 +207,7 @@ static int wslay_event_queue_close_wrapper ( wslay_event_context * ctx, uint16_t
     return 0;
 }
 
-int wslay_event_queue_msg ( wslay_event_context * ctx, const struct wslay_event_msg * arg )
+int wslay_event_queue_msg ( wslay_event_context * ctx, const wslay_event_msg * arg )
 {
     int r;
     if ( !wslay_event_is_msg_queueable ( ctx ) ) {
@@ -449,7 +449,7 @@ int wslay_event_recv ( wslay_event_context * ctx )
                                 return r;
                             }
                         } else if ( ctx->imsg->opcode == WSLAY_PING ) {
-                            struct wslay_event_msg arg;
+                            wslay_event_msg arg;
                             arg.opcode = WSLAY_PONG;
                             arg.msg = msg;
                             arg.msg_length = ctx->imsg->msg_length;

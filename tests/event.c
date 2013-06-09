@@ -164,7 +164,7 @@ void test_wslay_event_send_fragmented_msg_with_ctrl ( void )
     const char msg[] = "Hello";
     struct scripted_data_feed df;
     struct wslay_event_fragmented_msg arg;
-    struct wslay_event_msg ctrl_arg;
+    wslay_event_msg ctrl_arg;
     const uint8_t ans[] = {
         0x01, 0x03, 0x48, 0x65, 0x6c, /* "Hel" */
         0x89, 0x00, /* unmasked ping */
@@ -211,7 +211,7 @@ void test_wslay_event_send_ctrl_msg_first ( void )
     struct my_user_data ud;
     struct accumulator acc;
     const char msg[] = "Hello";
-    struct wslay_event_msg arg;
+    wslay_event_msg arg;
     const uint8_t ans[] = {
         0x89, 0x00, /* unmasked ping */
         0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f /* "Hello" */
@@ -271,7 +271,7 @@ void test_wslay_event_queue_close_without_code ( void )
     struct my_user_data ud;
     struct accumulator acc;
     const uint8_t ans[] = { 0x88, 0x00 };
-    struct wslay_event_msg ping = { WSLAY_PING, NULL, 0 };
+    wslay_event_msg ping = { WSLAY_PING, NULL, 0 };
     memset ( &callbacks, 0, sizeof ( callbacks ) );
     callbacks.send_callback = accumulator_send_callback;
     memset ( &acc, 0, sizeof ( acc ) );

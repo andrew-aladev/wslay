@@ -286,11 +286,11 @@ int wslay_event_recv ( wslay_event_context * ctx );
  */
 int wslay_event_send ( wslay_event_context * ctx );
 
-struct wslay_event_msg {
+typedef struct wslay_event_msg_t {
     uint8_t opcode;
     const uint8_t *msg;
     size_t msg_length;
-};
+} wslay_event_msg;
 
 /*
  * Queues message specified in arg.
@@ -314,7 +314,7 @@ struct wslay_event_msg {
  * WSLAY_ERR_NOMEM
  *   Out of memory.
  */
-int wslay_event_queue_msg ( wslay_event_context * ctx, const struct wslay_event_msg * arg );
+int wslay_event_queue_msg ( wslay_event_context * ctx, const wslay_event_msg * arg );
 
 // Specify "source" to generate message.
 union wslay_event_msg_source {
