@@ -57,10 +57,10 @@ ssize_t wslay_event_frame_recv_callback ( uint8_t * buf, size_t len, int flags, 
 }
 
 inline
-ssize_t wslay_event_frame_send_callback ( const uint8_t * data, size_t len, int flags, void * _user_data )
+ssize_t wslay_event_frame_send_callback ( const uint8_t * data, size_t len, int flags, void * _user_data, bool user_data_sending )
 {
     struct wslay_event_frame_user_data * user_data = _user_data;
-    return user_data->ctx->callbacks.send_callback ( user_data->ctx, data, len, flags, user_data->user_data );
+    return user_data->ctx->callbacks.send_callback ( user_data->ctx, data, len, flags, user_data->user_data, user_data_sending );
 }
 
 inline

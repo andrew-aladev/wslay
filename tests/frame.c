@@ -73,8 +73,7 @@ static ssize_t scripted_recv_callback ( uint8_t* data, size_t len, int flags,
     return wlen;
 }
 
-static ssize_t scripted_send_callback ( const uint8_t* data, size_t len,
-                                        int flags, void *user_data )
+static ssize_t scripted_send_callback ( const uint8_t* data, size_t len, int flags, void *user_data, bool user_data_sending )
 {
     struct scripted_data_feed *df = ( struct scripted_data_feed* ) user_data;
     size_t wlen = df->feedseq[df->seqidx] > len ? len : df->feedseq[df->seqidx];
@@ -362,7 +361,7 @@ struct accumulator {
     size_t length;
 };
 
-static ssize_t accumulator_send_callback ( const uint8_t *buf, size_t len, int flags, void * user_data )
+static ssize_t accumulator_send_callback ( const uint8_t *buf, size_t len, int flags, void * user_data, bool user_data_sending )
 {
     struct accumulator *acc = ( struct accumulator* ) user_data;
     assert ( acc->length + len < sizeof ( acc->buf ) );
@@ -511,10 +510,7 @@ void test_wslay_frame_send_interleaved_ctrl_frame ( void )
 
 void test_wslay_frame_send_1byte_masked ( void )
 {
-    struct wslay_frame_callbacks callbacks = { scripted_send_callback,
-               NULL,
-               static_genmask_callback
-    };
+    struct wslay_frame_callbacks callbacks = { scripted_send_callback, NULL, static_genmask_callback };
     struct wslay_frame_iocb iocb;
     /* Masked text frame containing "Hello" */
     uint8_t msg[] = { 0x81u, 0x85u, 0x37u, 0xfau, 0x21u, 0x3du, 0x7fu, 0x9fu,

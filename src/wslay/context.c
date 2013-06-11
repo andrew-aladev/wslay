@@ -34,7 +34,7 @@ extern inline
 ssize_t wslay_event_frame_recv_callback ( uint8_t * buf, size_t len, int flags, void * _user_data );
 
 extern inline
-ssize_t wslay_event_frame_send_callback ( const uint8_t * data, size_t len, int flags, void * _user_data );
+ssize_t wslay_event_frame_send_callback ( const uint8_t * data, size_t len, int flags, void * _user_data, bool user_data_sending );
 
 extern inline
 int wslay_event_frame_genmask_callback ( uint8_t * buf, size_t len, void * _user_data );

@@ -30,6 +30,8 @@
 #include "queue.h"
 #include "utf8.h"
 
+#include <stdbool.h>
+
 struct wslay_event_byte_chunk {
     uint8_t * data;
     size_t data_length;
@@ -137,7 +139,7 @@ typedef ssize_t ( * wslay_event_recv_callback ) ( struct wslay_event_context_t *
  * If the cause of error is EAGAIN or EWOULDBLOCK, set WSLAY_ERR_WOULDBLOCK instead.
  * This is important because it tells wslay_event_send() to stop sending data and return.
  */
-typedef ssize_t ( * wslay_event_send_callback ) ( struct wslay_event_context_t * ctx, const uint8_t * data, size_t len, int flags, void * user_data );
+typedef ssize_t ( * wslay_event_send_callback ) ( struct wslay_event_context_t * ctx, const uint8_t * data, size_t len, int flags, void * user_data, bool user_data_sending );
 
 // Callback function invoked by wslay_event_send() when it wants new mask key.
 // As described in RFC6455, only the traffic from WebSocket client is masked,

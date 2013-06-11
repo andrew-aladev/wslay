@@ -89,7 +89,7 @@ static ssize_t scripted_recv_callback ( wslay_event_context * ctx, uint8_t* data
     return wlen;
 }
 
-static ssize_t accumulator_send_callback ( wslay_event_context * ctx, const uint8_t *buf, size_t len, int flags, void* user_data )
+static ssize_t accumulator_send_callback ( wslay_event_context * ctx, const uint8_t *buf, size_t len, int flags, void* user_data, bool user_data_sending )
 {
     struct accumulator *acc = ( ( struct my_user_data* ) user_data )->acc;
     assert ( acc->length + len < sizeof ( acc->buf ) );
@@ -98,7 +98,7 @@ static ssize_t accumulator_send_callback ( wslay_event_context * ctx, const uint
     return len;
 }
 
-static ssize_t one_accumulator_send_callback ( wslay_event_context * ctx, const uint8_t *buf, size_t len, int flags, void* user_data )
+static ssize_t one_accumulator_send_callback ( wslay_event_context * ctx, const uint8_t *buf, size_t len, int flags, void* user_data, bool user_data_sending )
 {
     struct accumulator *acc = ( ( struct my_user_data* ) user_data )->acc;
     assert ( len > 0 );
@@ -113,7 +113,7 @@ static ssize_t fail_recv_callback ( wslay_event_context * ctx, uint8_t* data, si
     return -1;
 }
 
-static ssize_t fail_send_callback ( wslay_event_context * ctx, const uint8_t *buf, size_t len, int flags, void* user_data )
+static ssize_t fail_send_callback ( wslay_event_context * ctx, const uint8_t *buf, size_t len, int flags, void* user_data, bool user_data_sending )
 {
     wslay_event_set_error ( ctx, WSLAY_ERR_CALLBACK_FAILURE );
     return -1;

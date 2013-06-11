@@ -75,7 +75,7 @@ enum wslay_io_flags {
  * The implementation of this function must return the number of bytes sent.
  * If there is an error, return -1. The return value 0 is also treated an error by the library.
  */
-typedef ssize_t ( * wslay_frame_send_callback ) ( const uint8_t * data, size_t len, int flags, void * user_data );
+typedef ssize_t ( * wslay_frame_send_callback ) ( const uint8_t * data, size_t len, int flags, void * user_data, bool user_data_sending );
 
 /*
  * Callback function used by wslay_frame_recv() function when it needs more data.

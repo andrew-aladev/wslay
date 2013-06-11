@@ -93,7 +93,7 @@ int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
         if ( iocb->data_length > 0 ) {
             flags |= WSLAY_MSG_MORE;
         };
-        r = ctx->callbacks.send_callback ( ctx->oheadermark, len, flags, ctx->user_data );
+        r = ctx->callbacks.send_callback ( ctx->oheadermark, len, flags, ctx->user_data, false );
         if ( r > 0 ) {
             if ( r > len ) {
                 return WSLAY_ERR_INVALID_CALLBACK;
@@ -125,7 +125,7 @@ int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
                     for ( i = 0; i < writelen; ++i ) {
                         temp[i] = datamark[i] ^ ctx->omaskkey[ ( ctx->opayloadoff + i ) % 4];
                     }
-                    r = ctx->callbacks.send_callback ( temp, writelen, 0, ctx->user_data );
+                    r = ctx->callbacks.send_callback ( temp, writelen, 0, ctx->user_data, false );
                     if ( r > 0 ) {
                         if ( ( size_t ) r > writelen ) {
                             return WSLAY_ERR_INVALID_CALLBACK;
@@ -144,8 +144,7 @@ int16_t wslay_frame_send ( wslay_frame_context * ctx, struct wslay_frame_iocb * 
                 }
             } else {
                 ssize_t r;
-                r = ctx->callbacks.send_callback ( iocb->data, iocb->data_length, 0,
-                                                   ctx->user_data );
+                r = ctx->callbacks.send_callback ( iocb->data, iocb->data_length, 0, ctx->user_data, true );
                 if ( r > 0 ) {
                     if ( ( size_t ) r > iocb->data_length ) {
                         return WSLAY_ERR_INVALID_CALLBACK;
